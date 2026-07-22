@@ -1,0 +1,15 @@
+# CUDA build files
+*.o
+*.out
+*.cubin
+*.ptx
+
+# Results
+*.csv
+*.log
+
+# SLURM
+slurm-*.out
+
+# temporary
+*.tmp
