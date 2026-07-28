@@ -4,6 +4,7 @@
 //#include <cutil.h>
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include "diversity.cuh"
 #include "converters.cuh"
 #include "cuda_compat.h"

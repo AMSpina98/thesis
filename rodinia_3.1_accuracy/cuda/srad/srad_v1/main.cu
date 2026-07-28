@@ -138,24 +138,26 @@ int main(int argc, char *argv []){
 	float elapsed, o_elapsed;
 
 	
+	fp *d_I_host;
+	fp *o_d_I_host;
+	fp *d_sums_host;
+	fp *d_sums2_host;
+	fp *o_d_sums_host;
+	fp *o_d_sums2_host;
 
-	fp *d_I_host = (fp *)malloc(mem_size);
-	fp *o_d_I_host = (fp *)malloc(mem_size);
-	fp *d_sums_host = (fp *)malloc(mem_size);
-	fp *d_sums2_host = (fp *)malloc(mem_size);
-	fp *o_d_sums_host = (fp *)malloc(mem_size);
-	fp *o_d_sums2_host = (fp *)malloc(mem_size);
+	fp *d_dN_host;
+	fp *d_dS_host;
+	fp *d_dW_host;
+	fp *d_dE_host;
+	fp *d_c_host;
+	fp *o_d_dN_host;
+	fp *o_d_dS_host;
+	fp *o_d_dW_host;
+	fp *o_d_dE_host;
+	fp *o_d_c_host;
 
-	fp *d_dN_host = (fp *)malloc(mem_size);
-	fp *d_dS_host = (fp *)malloc(mem_size);
-	fp *d_dW_host = (fp *)malloc(mem_size);
-	fp *d_dE_host = (fp *)malloc(mem_size);
-	fp *d_c_host = (fp *)malloc(mem_size);
-	fp *o_d_dN_host = (fp *)malloc(mem_size);
-	fp *o_d_dS_host = (fp *)malloc(mem_size);
-	fp *o_d_dW_host = (fp *)malloc(mem_size);
-	fp *o_d_dE_host = (fp *)malloc(mem_size);
-	fp *o_d_c_host = (fp *)malloc(mem_size);
+	
+
 
 	cudaEvent_t startE, stopE;
 	cudaEventCreate(&startE);
@@ -292,6 +294,28 @@ int main(int argc, char *argv []){
 	cudaMalloc((void **)&d_c, mem_size);														// 
 	cudaMalloc((void **)&o_d_c, mem_size);														// 
 
+
+	
+	d_I_host = (fp *)malloc(mem_size);
+	o_d_I_host = (fp *)malloc(mem_size);
+	d_sums_host = (fp *)malloc(mem_size);
+	d_sums2_host = (fp *)malloc(mem_size);
+	o_d_sums_host = (fp *)malloc(mem_size);
+	o_d_sums2_host = (fp *)malloc(mem_size);
+
+	d_dN_host = (fp *)malloc(mem_size);
+	d_dS_host = (fp *)malloc(mem_size);
+	d_dW_host = (fp *)malloc(mem_size);
+	d_dE_host = (fp *)malloc(mem_size);
+	d_c_host = (fp *)malloc(mem_size);
+	o_d_dN_host = (fp *)malloc(mem_size);
+	o_d_dS_host = (fp *)malloc(mem_size);
+	o_d_dW_host = (fp *)malloc(mem_size);
+	o_d_dE_host = (fp *)malloc(mem_size);
+	o_d_c_host = (fp *)malloc(mem_size);
+
+
+
 	checkCUDAError("setup");
 
 	//================================================================================80
@@ -346,8 +370,8 @@ int main(int argc, char *argv []){
 	cudaMemcpy(d_I_host, d_I, mem_size, cudaMemcpyDeviceToHost);
 	cudaMemcpy(o_d_I_host, o_d_I, mem_size, cudaMemcpyDeviceToHost);
 
-	write_time_to_file("srad_v1_times.csv", "extract", elapsed, o_elapsed);
-	write_array_to_file("srad_v1_results.csv", "d_I", d_I_host, o_d_I_host, mem_size/sizeof(fp));
+	write_time_to_file("srad_v1_times.txt", "extract", elapsed, o_elapsed);
+	write_array_to_file("srad_v1_results.txt", "d_I", d_I_host, o_d_I_host, mem_size/sizeof(fp));
 	
 
 	time7 = get_time();
@@ -395,9 +419,9 @@ int main(int argc, char *argv []){
 		
 		string prepare_name = "prepare_iter_" + std::to_string(iter);
 
-		write_time_to_file("srad_v1_times.csv", prepare_name, elapsed, o_elapsed);
-		write_array_to_file("srad_v1_results.csv", "d_sums", d_sums_host, o_d_sums_host, mem_size/sizeof(fp));
-		write_array_to_file("srad_v1_results.csv", "d_sums2", d_sums2_host, o_d_sums2_host, mem_size/sizeof(fp));
+		write_time_to_file("srad_v1_times.txt", prepare_name, elapsed, o_elapsed);
+		write_array_to_file("srad_v1_results.txt", "d_sums", d_sums_host, o_d_sums_host, mem_size/sizeof(fp));
+		write_array_to_file("srad_v1_results.txt", "d_sums2", d_sums2_host, o_d_sums2_host, mem_size/sizeof(fp));
 
 
 
@@ -445,9 +469,9 @@ int main(int argc, char *argv []){
 			
 			string reduce_name = "reduce_iter_" + std::to_string(iter) + "_blocks_" + std::to_string(blocks2.x);
 			
-			write_time_to_file("srad_v1_times.csv", reduce_name, elapsed, o_elapsed);
-			write_array_to_file("srad_v1_results.csv", "d_sums", d_sums_host, o_d_sums_host, mem_size/sizeof(fp));
-			write_array_to_file("srad_v1_results.csv", "d_sums2", d_sums2_host, o_d_sums2_host, mem_size/sizeof(fp));
+			write_time_to_file("srad_v1_times.txt", reduce_name, elapsed, o_elapsed);
+			write_array_to_file("srad_v1_results.txt", "d_sums", d_sums_host, o_d_sums_host, mem_size/sizeof(fp));
+			write_array_to_file("srad_v1_results.txt", "d_sums2", d_sums2_host, o_d_sums2_host, mem_size/sizeof(fp));
 
 
 
@@ -532,7 +556,7 @@ int main(int argc, char *argv []){
 									o_d_dN,									// North derivative
 									o_d_dS,									// South derivative
 									o_d_dW,									// West derivative
-									o_dE,									// East derivative
+									o_d_dE,									// East derivative
 									o_q0sqr,									// standard deviation of ROI 
 									o_d_c,									// diffusion coefficient
 									o_d_I);									// output image
@@ -541,7 +565,7 @@ int main(int argc, char *argv []){
 		cudaEventSynchronize(stopE);
 		cudaEventElapsedTime(&o_elapsed, startE, stopE);
 
-		checkCUDAError("srad");
+		checkCUDAError("o_srad");
 
 		cudaMemcpy(d_dN_host, d_dN, mem_size, cudaMemcpyDeviceToHost);
 		cudaMemcpy(d_dS_host, d_dS, mem_size, cudaMemcpyDeviceToHost);
@@ -556,15 +580,18 @@ int main(int argc, char *argv []){
 
 		string srad_name = "srad_iter_" + std::to_string(iter);
 			
-		write_time_to_file("srad_v1_times.csv", srad_name, elapsed, o_elapsed);
-		write_array_to_file("srad_v1_results.csv", "d_dN", d_dN_host, o_d_dN_host, mem_size/sizeof(fp));
-		write_array_to_file("srad_v1_results.csv", "d_dS", d_dS_host, o_d_dS_host, mem_size/sizeof(fp));
-		write_array_to_file("srad_v1_results.csv", "d_dW", d_dW_host, o_d_dW_host, mem_size/sizeof(fp));
-		write_array_to_file("srad_v1_results.csv", "d_dE", d_dE_host, o_d_dE_host, mem_size/sizeof(fp));
-		write_array_to_file("srad_v1_results.csv", "d_c", d_c_host, o_d_c_host, mem_size/sizeof(fp));
+		write_time_to_file("srad_v1_times.txt", srad_name, elapsed, o_elapsed);
+		write_array_to_file("srad_v1_results.txt", "d_dN", d_dN_host, o_d_dN_host, mem_size/sizeof(fp));
+		write_array_to_file("srad_v1_results.txt", "d_dS", d_dS_host, o_d_dS_host, mem_size/sizeof(fp));
+		write_array_to_file("srad_v1_results.txt", "d_dW", d_dW_host, o_d_dW_host, mem_size/sizeof(fp));
+		write_array_to_file("srad_v1_results.txt", "d_dE", d_dE_host, o_d_dE_host, mem_size/sizeof(fp));
+		write_array_to_file("srad_v1_results.txt", "d_c", d_c_host, o_d_c_host, mem_size/sizeof(fp));
 
 
 		// execute srad2 kernel
+		
+		cudaEventRecord(startE);
+
 		srad2<<<blocks, threads>>>(	lambda,									// SRAD coefficient 
 									Nr,										// # of rows in input image
 									Nc,										// # of columns in input image
@@ -579,8 +606,42 @@ int main(int argc, char *argv []){
 									d_dE,									// East derivative
 									d_c,									// diffusion coefficient
 									d_I);									// output image
-
+		
+		cudaEventRecord(stopE);
+		cudaEventSynchronize(stopE);
+		cudaEventElapsedTime(&elapsed, startE, stopE);
+		
 		checkCUDAError("srad2");
+
+		cudaEventRecord(startE);
+
+		o_srad2<<<blocks, threads>>>(	lambda,									// SRAD coefficient 
+									Nr,										// # of rows in input image
+									Nc,										// # of columns in input image
+									Ne,										// # of elements in input image
+									d_iN,									// indices of North surrounding pixels
+									d_iS,									// indices of South surrounding pixels
+									d_jE,									// indices of East surrounding pixels
+									d_jW,									// indices of West surrounding pixels
+									o_d_dN,									// North derivative
+									o_d_dS,									// South derivative
+									o_d_dW,									// West derivative
+									o_d_dE,									// East derivative
+									o_d_c,									// diffusion coefficient
+									o_d_I);									// output image
+		
+		cudaEventRecord(stopE);
+		cudaEventSynchronize(stopE);
+		cudaEventElapsedTime(&o_elapsed, startE, stopE);
+		
+		checkCUDAError("o_srad2");
+
+		cudaMemcpy(d_I_host, d_I, mem_size, cudaMemcpyDeviceToHost);
+		cudaMemcpy(o_d_I_host, o_d_I, mem_size, cudaMemcpyDeviceToHost);
+
+		string srad2_name = "srad2_iter_" + std::to_string(iter);
+		write_time_to_file("srad_v1_times.txt", srad2_name, elapsed, o_elapsed);
+		write_array_to_file("srad_v1_results.txt", "d_I", d_I_host, o_d_I_host, mem_size/sizeof(fp));
 
 	}
 
