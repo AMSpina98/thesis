@@ -123,11 +123,13 @@ namespace NEMath {
         float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
         uint8_t mantissaC = NEMath::NearbyUInt(I);
         if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        if(mantissaC == 0) return NE(0);
         return ((signA ^ signB) << 7) | mantissaC;
     }
 
 
     __host__ __device__ inline NE dDiv(NE A, NE B) {
+        if(A == NEFormat::NE_NAN || B == NEFormat::NE_NAN) return NE(NEFormat::NE_NAN);
         uint8_t mantissaA = (A & NEFormat::MAX_MANTISSA);
         uint8_t mantissaB = (B & NEFormat::MAX_MANTISSA);
         if(mantissaB == 0) return NE(NEFormat::NE_NAN);
@@ -140,10 +142,12 @@ namespace NEMath {
         float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
         uint8_t mantissaC = NEMath::NearbyUInt(I);
         if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        if(mantissaC == 0) return NE(0);
         return ((signA ^ signB) << 7) | mantissaC;
     }
 
     __host__ __device__ inline NE dAdd(NE A, NE B) {
+        if(A == NEFormat::NE_NAN || B == NEFormat::NE_NAN) return NE(NEFormat::NE_NAN);
         uint8_t mantissaA = (A & NEFormat::MAX_MANTISSA);
         uint8_t mantissaB = (B & NEFormat::MAX_MANTISSA);
         uint8_t signA = (A >> 7) & 0x1;
@@ -173,6 +177,7 @@ namespace NEMath {
         } else{
             if (mantissaTempA == mantissaTempB) return NE(static_cast<uint8_t>(0));
             uint64_t mantissa = (((uint64_t)mantissaTempB << NEFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
+            if(mantissa == 0) return NE(static_cast<uint8_t>(0));
             return (signB << 7) | mantissa;
         }
     }
