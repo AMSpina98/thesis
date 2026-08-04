@@ -126,7 +126,7 @@ __constant__ double3 ff_flux_contribution_density_energy[1];
 __global__ void cuda_initialize_variables(int nelr, double* variables)
 {
 	const int i = dAdd(dMul(blockDim.x, blockIdx.x), threadIdx.x);
-	for(int j = 0; j < NVAR; dAdd(j, 1))
+	for(int j = 0; j < NVAR; j = dAdd(j, 1))
 		variables[dAdd(i, dMul(j, nelr))] = ff_variable[j];
 	//const int i = (blockDim.x*blockIdx.x + threadIdx.x);
 	//for(int j = 0; j < NVAR; j++)
@@ -310,7 +310,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 	double speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 	
 	#pragma unroll
-	for(j = 0; j < NNB; dAdd(j, 1))
+	for(j = 0; j < NNB; j = dAdd(j, 1))
 	{
 		//nb = elements_surrounding_elements[i + j*nelr];
 		//normal.x = normals[i + (j + 0*NNB)*nelr];
@@ -413,7 +413,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y[0].x + flux_contribution_i_momentum_y.x);
 			//flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z[0].x + flux_contribution_i_momentum_z.x);
 			factor = dMul(double(0.5),normal.x);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+0], momentum_i.x)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 0)], momentum_i.x)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_flux_contribution_density_energy[0].x, flux_contribution_i_density_energy.x)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_flux_contribution_momentum_x[0].x, flux_contribution_i_momentum_x.x)));
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_flux_contribution_momentum_y[0].x, flux_contribution_i_momentum_y.x)));
@@ -426,7 +426,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y[0].y + flux_contribution_i_momentum_y.y);
 			//flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z[0].y + flux_contribution_i_momentum_z.y);
 			factor = dMul(double(0.5), normal.y);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+1], momentum_i.y)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 1)], momentum_i.y)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_flux_contribution_density_energy[0].y, flux_contribution_i_density_energy.y)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_flux_contribution_momentum_x[0].y, flux_contribution_i_momentum_x.y)));
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_flux_contribution_momentum_y[0].y, flux_contribution_i_momentum_y.y)));
@@ -439,7 +439,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y[0].z + flux_contribution_i_momentum_y.z);
 			//flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z[0].z + flux_contribution_i_momentum_z.z);
 			factor = dMul(double(0.5), normal.z);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+2], momentum_i.z)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 2)], momentum_i.z)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_flux_contribution_density_energy[0].z, flux_contribution_i_density_energy.z)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_flux_contribution_momentum_x[0].z, flux_contribution_i_momentum_x.z)));
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_flux_contribution_momentum_y[0].z, flux_contribution_i_momentum_y.z)));
@@ -485,11 +485,11 @@ __global__ void cuda_time_step(int j, int nelr, double* old_variables, double* v
 	//variables[i + (VAR_MOMENTUM+0)*nelr] = old_variables[i + (VAR_MOMENTUM+0)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+0)*nelr];
 	//variables[i + (VAR_MOMENTUM+1)*nelr] = old_variables[i + (VAR_MOMENTUM+1)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+1)*nelr];	
 	//variables[i + (VAR_MOMENTUM+2)*nelr] = old_variables[i + (VAR_MOMENTUM+2)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+2)*nelr];	
-	variables[dAdd(i, dMul(VAR_DENSITY, nelr))] = old_variables[dAdd(i, dMul(VAR_DENSITY, nelr))] + factor*fluxes[dAdd(i, dMul(VAR_DENSITY, nelr))];
-	variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] = old_variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] + factor*fluxes[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))];
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))];
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))];	
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))];	
+	variables[dAdd(i, dMul(VAR_DENSITY, nelr))] = dAdd(old_variables[dAdd(i, dMul(VAR_DENSITY, nelr))], dMul(factor, fluxes[dAdd(i, dMul(VAR_DENSITY, nelr))]));
+	variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] = dAdd(old_variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))], dMul(factor, fluxes[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))]));
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))]));
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))]));	
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))]));	
 }
 void time_step(int j, int nelr, double* old_variables, double* variables, double* step_factors, double* fluxes)
 {
@@ -503,7 +503,6 @@ void time_step(int j, int nelr, double* old_variables, double* variables, double
 	  }
 
 }
-
 
 /*
  * Main function
@@ -647,13 +646,20 @@ int main(int argc, char** argv)
 	float flux_total = 0.0f;
 	float time_total = 0.0f;
 	cudaEvent_t startStep, stopStep, startFlux, stopFlux, startTimeStep, stopTimeStep;
+	cudaEventCreate(&startStep);
+	cudaEventCreate(&stopStep);
+	cudaEventCreate(&startFlux);
+	cudaEventCreate(&stopFlux);
+	cudaEventCreate(&startTimeStep);
+	cudaEventCreate(&stopTimeStep);
+
 
 	// make sure all memory is doublely allocated before we start timing
 	initialize_variables(nelr, old_variables);
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(double)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
@@ -662,7 +668,7 @@ int main(int argc, char** argv)
 	StopWatchInterface *timer = NULL;
 
 	sdkCreateTimer( &timer);
-	sdkStartTimer( &timer);
+	sdkStartTimer( timer);
 
 	// Begin iterations
 	for(int i = 0; i < iterations; i++)
@@ -701,10 +707,10 @@ int main(int argc, char** argv)
 			cudaEventRecord(stopFlux);
 			cudaEventSynchronize(stopFlux);
 
-			float elapsed;
-			cudaEventElapsedTime(&elapsed, startFlux, stopFlux);
+			float elapsedFlux;
+			cudaEventElapsedTime(&elapsedFlux, startFlux, stopFlux);
 
-			flux_total += elapsed;
+			flux_total += elapsedFlux;
 		    error = cudaGetLastError();
 		    if (error != cudaSuccess) 
 		      {
@@ -718,10 +724,10 @@ int main(int argc, char** argv)
 			cudaEventRecord(stopTimeStep);
 			cudaEventSynchronize(stopTimeStep);
 
-			float elapsed;
-			cudaEventElapsedTime(&elapsed, startTimeStep, stopTimeStep);
+			float elapsedStep;
+			cudaEventElapsedTime(&elapsedStep, startTimeStep, stopTimeStep);
 
-			time_total += elapsed;
+			time_total += elapsedStep;
 
 		    error = cudaGetLastError();
 		    if (error != cudaSuccess) 
@@ -733,10 +739,10 @@ int main(int argc, char** argv)
 		  }
 	}
 
-	cudaThreadSynchronize();
-	sdkStopTimer(&timer);  
+	cudaDeviceSynchronize();
+	sdkStopTimer(timer);  
 
-	std::cout  << (sdkGetAverageTimerValue(&timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
+	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
 
 	
 	std::cout << "Average step time: " << step_total << " ms" << std::endl;
@@ -750,6 +756,12 @@ int main(int argc, char** argv)
 
 	
 	std::cout << "Cleaning up..." << std::endl;
+	cudaEventDestroy(startStep);
+	cudaEventDestroy(stopStep);
+	cudaEventDestroy(startFlux);
+	cudaEventDestroy(stopFlux);
+	cudaEventDestroy(startTimeStep);
+	cudaEventDestroy(stopTimeStep);
 	dealloc<double>(areas);
 	dealloc<int>(elements_surrounding_elements);
 	dealloc<double>(normals);

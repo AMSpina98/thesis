@@ -1,4 +1,6 @@
 // BUG IN SRAD APPLICATIONS SEEMS TO BE SOMEWHERE IN THIS CODE, MEMORY CORRUPTION
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
 
 // srad kernel
 __global__ void srad2(	fp d_lambda, 

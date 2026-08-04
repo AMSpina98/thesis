@@ -6,11 +6,12 @@
 #include <string.h>
 #include <math.h>
 #include <cuda.h>
-#include <sys/time.h>
 
 // includes, kernels
 #include "backprop_cuda_kernel.cu"
 #include "backprop.h"
+#include "win_compat.h"
+#include "cuda_compat.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -141,7 +142,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 	float elapsed;
 	cudaEventElapsedTime(&elapsed, startE, stopE);
 
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
 
   cudaError_t error = cudaGetLastError();
 	if (error != cudaSuccess) {
@@ -157,7 +158,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 	float o_elapsed;
 	cudaEventElapsedTime(&o_elapsed, startE, stopE);
   
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   
   error = cudaGetLastError();
 	if (error != cudaSuccess) {
@@ -239,6 +240,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
   cudaMemcpy(input_hidden_cuda, input_weights_one_dim, (in + 1) * (hid + 1) * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(o_input_hidden_cuda, input_weights_one_dim, (in + 1) * (hid + 1) * sizeof(float), cudaMemcpyHostToDevice);
 
+  //to duplicate
   cudaEventRecord(startE);
   bpnn_adjust_weights_cuda<<< grid, threads >>>(hidden_delta_cuda, hid, input_cuda, in, input_hidden_cuda, input_prev_weights_cuda);
 
@@ -246,7 +248,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 	cudaEventSynchronize(stopE);
 	cudaEventElapsedTime(&elapsed, startE, stopE);
 
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   
   
   error = cudaGetLastError();
@@ -263,7 +265,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 	cudaEventSynchronize(stopE);
 	cudaEventElapsedTime(&o_elapsed, startE, stopE);
 
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   
   error = cudaGetLastError();
 	if (error != cudaSuccess) {

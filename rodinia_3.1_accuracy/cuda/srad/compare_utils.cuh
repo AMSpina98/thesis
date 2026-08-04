@@ -2,7 +2,6 @@
 #include <string>
 #include <fstream>
 #include <cmath>
-#include "../common.h"	
 using namespace std;
 
 template <typename T>
@@ -41,7 +40,7 @@ void compare_array(T* array, T* o_array, int count, ArrayErrorData<T>& error_dat
             }
             double rel_diff = std::abs(static_cast<double>(array[i] - o_array[i]));
             error_data.abs_RMSE += rel_diff * rel_diff;
-            double denominator = std::abs(static_cast<double>(array[i]));
+            double denominator = std::abs(static_cast<double>(o_array[i]));
             if(denominator > 0) rel_diff /= denominator;
             if (rel_diff > error_data.max_rel_diff) {
                 error_data.max_rel_diff = rel_diff;

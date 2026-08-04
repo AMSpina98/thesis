@@ -47,6 +47,15 @@ runTest( int argc, char** argv)
     int rows, cols, size_I, size_R, niter = 10, iter;
     float *I, *J, lambda, q0sqr, sum, sum2, tmp, meanROI,varROI ;
 
+	
+
+	cudaEvent_t startE, stopE;
+	cudaEventCreate(&startE);
+	cudaEventCreate(&stopE);
+	cudaEventRecord(startE);
+
+
+
 #ifdef CPU
 	float Jc, G2, L, num, den, qsqr;
 	int *iN,*iS,*jE,*jW, k;
@@ -95,6 +104,20 @@ runTest( int argc, char** argv)
 	I = (float *)malloc( size_I * sizeof(float) );
     J = (float *)malloc( size_I * sizeof(float) );
 	c  = (float *)malloc(sizeof(float)* size_I) ;
+
+	
+	float *E_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *W_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *N_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *S_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_E_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_W_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_N_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_S_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_C_host = (float *)malloc( size_I * sizeof(float) );
+	float *o_J_host = (float *)malloc( size_I * sizeof(float) );
+	float *J_host = (float *)malloc( size_I * sizeof(float) );
 
 
 #ifdef CPU
@@ -237,11 +260,6 @@ runTest( int argc, char** argv)
 	//Run kernels
 
 
-	cudaEvent_t startE, stopE;
-	cudaEventCreate(&startE);
-	cudaEventCreate(&stopE);
-	cudaEventRecord(startE);
-
 	srad_cuda_1<<<dimGrid, dimBlock>>>(E_C, W_C, N_C, S_C, J_cuda, C_cuda, cols, rows, q0sqr); 
 
 	cudaEventRecord(stopE);
@@ -249,7 +267,7 @@ runTest( int argc, char** argv)
 	float elapsed;
 	cudaEventElapsedTime(&elapsed, startE, stopE);
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	cudaError_t error = cudaGetLastError();
 	if (error != cudaSuccess) {
@@ -266,7 +284,7 @@ runTest( int argc, char** argv)
 	float o_elapsed_1;
 	cudaEventElapsedTime(&o_elapsed_1, startE, stopE);
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	error = cudaGetLastError();
 	if (error != cudaSuccess) {
@@ -283,7 +301,7 @@ runTest( int argc, char** argv)
 	float elapsed_2;
 	cudaEventElapsedTime(&elapsed_2, startE, stopE);
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	error = cudaGetLastError();
 	if (error != cudaSuccess) {
@@ -300,26 +318,13 @@ runTest( int argc, char** argv)
 	float o_elapsed_2;
 	cudaEventElapsedTime(&o_elapsed_2, startE, stopE);
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	error = cudaGetLastError();
 	if (error != cudaSuccess) {
 		printf("o_srad_cuda_2 error: %s\n", cudaGetErrorString(error));
 		exit(EXIT_FAILURE);
 	}
-
-	float *E_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *W_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *N_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *S_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_E_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_W_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_N_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_S_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_C_host = (float *)malloc( size_I * sizeof(float) );
-	float *o_J_host = (float *)malloc( size_I * sizeof(float) );
-	float *J_host = (float *)malloc( size_I * sizeof(float) );
 
 
 	cudaMemcpy(E_C_host, E_C, size_I * sizeof(float), cudaMemcpyDeviceToHost);
@@ -350,7 +355,7 @@ runTest( int argc, char** argv)
 #endif   
 }
 
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
 #ifdef OUTPUT
     //Printing output	
@@ -364,12 +369,8 @@ runTest( int argc, char** argv)
 #endif 
 
 	printf("Computation Done\n");
-
 	cudaEventDestroy(startE);
 	cudaEventDestroy(stopE);
-  
-	free(I);
-	free(J);
 	free(E_C_host);
 	free(W_C_host);
 	free(N_C_host);
@@ -382,6 +383,10 @@ runTest( int argc, char** argv)
 	free(o_C_host);
 	free(o_J_host);
 	free(J_host);
+
+  
+	free(I);
+	free(J);
 #ifdef CPU
 	free(iN); free(iS); free(jW); free(jE);
     free(dN); free(dS); free(dW); free(dE);

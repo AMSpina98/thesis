@@ -1,11 +1,12 @@
 // Copyright 2009, Andrew Corrigan, acorriga@gmu.edu
 // This code is from the AIAA-2009-4001 paper
 
-#include <helper_cuda.h>
-#include <helper_timer.h>
 
 #include <iostream>
 #include <fstream>
+#include "cuda_compat.h"
+#include "diversity.cuh"
+#include "converters.cuh"
 
 #if CUDART_VERSION < 3000
 struct double3
@@ -35,11 +36,11 @@ struct double3
  * not options
  */
 
-
+/*
 #if block_length > 128
 #warning "the kernels may fail too launch on some systems if the block length is too large"
 #endif
-
+*/
 
 #define VAR_DENSITY 0
 #define VAR_MOMENTUM  1
@@ -122,12 +123,11 @@ __constant__ double3 ff_fc_momentum_y[1];
 __constant__ double3 ff_fc_momentum_z[1];
 __constant__ double3 ff_fc_density_energy[1];
 
-
 __global__ void cuda_initialize_variables(int nelr, double* variables)
 {
 	//const int i = (blockDim.x*blockIdx.x + threadIdx.x);
 	const int i = dAdd(dMul(blockDim.x, blockIdx.x), threadIdx.x);
-	for(int j = 0; j < NVAR; dAdd(j, 1))
+	for(int j = 0; j < NVAR; j = dAdd(j, 1))
 		variables[dAdd(i, dMul(j, nelr))] = ff_variable[j];
 }
 void initialize_variables(int nelr, double* variables)
@@ -413,18 +413,18 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 	double speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 	
 	#pragma unroll
-	for(j = 0; j < NNB; dAdd(j, 1))
+	for(j = 0; j < NNB; j = dAdd(j, 1))
 	{
 		//nb = elements_surrounding_elements[i + j*nelr];
 		//normal.x = normals[i + (j + 0*NNB)*nelr];
 		//normal.y = normals[i + (j + 1*NNB)*nelr];
 		//normal.z = normals[i + (j + 2*NNB)*nelr];
 		//normal_len = sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
-		nb = elements_surrounding_elements[i + j*nelr];
-		normal.x = normals[i + (j + 0*NNB)*nelr];
-		normal.y = normals[i + (j + 1*NNB)*nelr];
-		normal.z = normals[i + (j + 2*NNB)*nelr];
-		normal_len = sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
+		nb = elements_surrounding_elements[dAdd(i, dMul(j, nelr))];
+		normal.x = normals[dAdd(i, dMul(dAdd(j, dMul(0, NNB)), nelr))];
+		normal.y = normals[dAdd(i, dMul(dAdd(j, dMul(1, NNB)), nelr))];
+		normal.z = normals[dAdd(i, dMul(dAdd(j, dMul(2, NNB)), nelr))];
+		normal_len = sqrt(dAdd(dMul(normal.x, normal.x), dAdd(dMul(normal.y, normal.y), dMul(normal.z, normal.z))));
 		
 		if(nb >= 0) 	// a legitimate neighbor
 		{
@@ -549,7 +549,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_fc_momentum_y[0].x + fc_i_momentum_y.x);
 			//flux_i_momentum.z += factor*(ff_fc_momentum_z[0].x + fc_i_momentum_z.x);
 			factor = dMul(double(0.5), normal.x);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+0], momentum_i.x)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 0)], momentum_i.x)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_fc_density_energy[0].x, fc_i_density_energy.x)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_fc_momentum_x[0].x, fc_i_momentum_x.x)));
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_fc_momentum_y[0].x, fc_i_momentum_y.x)));
@@ -562,7 +562,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_fc_momentum_y[0].y + fc_i_momentum_y.y);
 			//flux_i_momentum.z += factor*(ff_fc_momentum_z[0].y + fc_i_momentum_z.y);
 			factor = dMul(double(0.5), normal.y);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+1], momentum_i.y)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 1)], momentum_i.y)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_fc_density_energy[0].y, fc_i_density_energy.y)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_fc_momentum_x[0].y, fc_i_momentum_x.y)))	;
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_fc_momentum_y[0].y, fc_i_momentum_y.y)));
@@ -575,7 +575,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 			//flux_i_momentum.y += factor*(ff_fc_momentum_y[0].z + fc_i_momentum_y.z);
 			//flux_i_momentum.z += factor*(ff_fc_momentum_z[0].z + fc_i_momentum_z.z);
 			factor = dMul(double(0.5), normal.z);
-			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[VAR_MOMENTUM+2], momentum_i.z)));
+			flux_i_density = dAdd(flux_i_density, dMul(factor, dAdd(ff_variable[dAdd(VAR_MOMENTUM, 2)], momentum_i.z)));
 			flux_i_density_energy = dAdd(flux_i_density_energy, dMul(factor, dAdd(ff_fc_density_energy[0].z, fc_i_density_energy.z)));
 			flux_i_momentum.x = dAdd(flux_i_momentum.x, dMul(factor, dAdd(ff_fc_momentum_x[0].z, fc_i_momentum_x.z)));
 			flux_i_momentum.y = dAdd(flux_i_momentum.y, dMul(factor, dAdd(ff_fc_momentum_y[0].z, fc_i_momentum_y.z)));
@@ -789,14 +789,14 @@ int main(int argc, char** argv)
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(double)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
 
 	StopWatchInterface *timer = NULL;
 	sdkCreateTimer( &timer);
-	sdkStartTimer( &timer);
+	sdkStartTimer( timer);
 
 	// Begin iterations
 	for(int i = 0; i < iterations; i++)
@@ -814,10 +814,10 @@ int main(int argc, char** argv)
 		}
 	}
 
-	cudaThreadSynchronize();
-	sdkStopTimer(&timer);  
+	cudaDeviceSynchronize();
+	sdkStopTimer(timer);  
 
-	std::cout  << (sdkGetAverageTimerValue(&timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
+	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
 
 	std::cout << "Saving solution..." << std::endl;
 	dump(variables, nel, nelr);

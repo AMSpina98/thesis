@@ -17,6 +17,9 @@
 #include <stdint.h>					// (in path known to compiler)			needed by uint32_t
 #include <stdbool.h>				// (in path known to compiler)			needed by true/false, bool
 #include <stdlib.h>					// (in path known to compiler)			needed by malloc
+#ifndef __CUDACC__
+#include "../diversity/win_compat.h"
+#endif
 
 //======================================================================================================================================================150
 //	DEFINE
@@ -56,7 +59,7 @@
 
 
 /* #define DEFAULT_ORDER 508 */
-
+#ifdef __linux__
 #define malloc(size) ({                                                   \
   void *_tmp;                                                             \
                                                                           \
@@ -67,6 +70,7 @@
                                                                           \
   _tmp;                                                                   \
 })
+#endif
 
 //======================================================================================================================================================150
 //	STRUCTURES

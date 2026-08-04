@@ -1,0 +1,31 @@
+NVCC := nvcc
+
+CUDA_FLAGS = -gencode arch=compute_70,code=sm_70 \
+             -gencode arch=compute_80,code=sm_80 \
+             -gencode arch=compute_90,code=sm_90
+
+NVCC_FLAGS = -O3 $(CUDA_FLAGS)
+
+SRC = srad.cu
+EXE = srad
+
+
+all: $(EXE)
+
+
+$(EXE): $(SRC)
+	$(NVCC) $(NVCC_FLAGS) \
+		$(SRC) \
+		-o $(EXE) \
+		-lm -lcuda -lcudart
+
+
+debug: $(SRC)
+	$(NVCC) -g -G \
+		$(CUDA_FLAGS) \
+		$(SRC) \
+		-o $(EXE)
+
+
+clean:
+	rm -f $(EXE) $(EXE).linkinfo result.txt

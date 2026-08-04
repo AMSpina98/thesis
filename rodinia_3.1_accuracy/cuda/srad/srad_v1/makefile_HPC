@@ -1,0 +1,33 @@
+NVCC := nvcc
+
+CUDA_FLAGS = -gencode arch=compute_70,code=sm_70 \
+             -gencode arch=compute_80,code=sm_80 \
+             -gencode arch=compute_90,code=sm_90
+
+NVCC_FLAGS = -O3 $(CUDA_FLAGS)
+
+
+all: srad
+
+srad: main.o
+	$(NVCC) main.o \
+		-lm -lcuda -lcudart \
+		-o srad
+
+
+main.o: main.cu \
+        define.c \
+        graphics.c \
+        extract_kernel.cu \
+        prepare_kernel.cu \
+        reduce_kernel.cu \
+        srad_kernel.cu \
+        srad2_kernel.cu \
+        compress_kernel.cu
+
+	$(NVCC) main.cu \
+		-c $(NVCC_FLAGS)
+
+
+clean:
+	rm -f *.o srad

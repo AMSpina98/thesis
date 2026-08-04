@@ -1,6 +1,6 @@
 // BUG IN SRAD APPLICATIONS SEEMS TO BE SOMEWHERE IN THIS CODE, WRONG MEMORY ACCESS
-#include "diversity.cuh"
-#include "converters.cuh"
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
 
 // srad kernel
 __global__ void srad(	fp d_lambda, 
@@ -71,7 +71,7 @@ __global__ void srad(	fp d_lambda,
 
 		// ICOV (equ 31/35)
 		//d_num  = (0.5*d_G2) - ((1.0/16.0)*(d_L*d_L)) ;						// num (based on gradient and laplacian)
-		d_num  = dSub(dMul(0.5, d_G2), dMul(dMul(dDiv(1.0, 16.0), dMul(d_L, d_L))));						// num (based on gradient and laplacian)
+		d_num  = dSub(dMul(0.5, d_G2), dMul(dDiv(1.0, 16.0), dMul(d_L, d_L)));						// num (based on gradient and laplacian)
 		//d_den  = 1 + (0.25*d_L);												// den (based on laplacian)
 		d_den  = dAdd(1, dMul(0.25, d_L));												// den (based on laplacian)
 		//d_qsqr = d_num/(d_den*d_den);										// qsqr (based on num and den)

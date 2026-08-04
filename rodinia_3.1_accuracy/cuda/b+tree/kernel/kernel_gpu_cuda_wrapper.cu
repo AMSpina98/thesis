@@ -80,7 +80,7 @@ kernel_gpu_cuda_wrapper(record *records,
 	//	INITIAL DRIVER OVERHEAD
 	//====================================================================================================100
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	//====================================================================================================100
 	//	EXECUTION PARAMETERS
@@ -252,7 +252,7 @@ kernel_gpu_cuda_wrapper(record *records,
 	cudaEventSynchronize(stop);
 	float elapsed;
 	cudaEventElapsedTime(&elapsed, start, stop);
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	checkCUDAError("findK");
 
 	cudaEventRecord(start);
@@ -272,7 +272,7 @@ kernel_gpu_cuda_wrapper(record *records,
 	cudaEventSynchronize(stop);
 	float o_elapsed;
 	cudaEventElapsedTime(&o_elapsed, start, stop);
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	checkCUDAError("findK");
 
 

@@ -36,22 +36,6 @@ struct Converter<int> {
     }
 };
 
-
-template<>
-struct Converter<unsigned int> {
-    __host__ __device__ static float to(unsigned int x){
-        return (float)x;
-    }
-
-    __host__ __device__ static unsigned int from(float x){
-#ifdef __CUDA_ARCH__
-        return __float2uint_rn(x);
-#else
-        return static_cast<unsigned int>(x);
-#endif
-    }
-};
-
 template<>
 struct Converter<double> {
     __host__ __device__ static float to(double x) {

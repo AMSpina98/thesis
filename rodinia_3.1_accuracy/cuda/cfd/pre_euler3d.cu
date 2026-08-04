@@ -2,11 +2,12 @@
 // This code is from the AIAA-2009-4001 paper
 
 // #include <cutil.h>
-#include <helper_cuda.h>
-#include <helper_timer.h>
 
 #include <iostream>
 #include <fstream>
+#include "cuda_compat.h"
+#include "diversity.cuh"
+#include "converters.cuh"
 
  
  
@@ -31,11 +32,11 @@
  * not options
  */
 
-
+/*
 #if block_length > 128
 #warning "the kernels may fail too launch on some systems if the block length is too large"
 #endif
-
+*/
 
 #define VAR_DENSITY 0
 #define VAR_MOMENTUM  1
@@ -118,14 +119,13 @@ __constant__ float3 ff_fc_momentum_y[1];
 __constant__ float3 ff_fc_momentum_z[1];
 __constant__ float3 ff_fc_density_energy[1];
 
-
 __global__ void cuda_initialize_variables(int nelr, float* variables)
 {
 	//const int i = (blockDim.x*blockIdx.x + threadIdx.x);
 	const int i = dAdd(dMul(blockDim.x, blockIdx.x), threadIdx.x);
 	//for(int j = 0; j < NVAR; j++)
 	//	variables[i + j*nelr] = ff_variable[j];
-	for(int j = 0; j < NVAR; dAdd(j, 1))
+	for(int j = 0; j < NVAR; j = dAdd(j, 1))
 		variables[dAdd(i, dMul(j, nelr))] = ff_variable[j];
 }
 void initialize_variables(int nelr, float* variables)
@@ -401,7 +401,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 	
 	#pragma unroll
 	//for(j = 0; j < NNB; j++)
-	for(j = 0; j < NNB; dAdd(j, 1))
+	for(j = 0; j < NNB; j = dAdd(j, 1))
 	{
 		//nb = elements_surrounding_elements[i + j*nelr];
 		nb = elements_surrounding_elements[dAdd(i, dMul(j, nelr))];
@@ -604,11 +604,11 @@ __global__ void cuda_time_step(int j, int nelr, float* old_variables, float* var
 	//variables[i + (VAR_MOMENTUM+0)*nelr] = old_variables[i + (VAR_MOMENTUM+0)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+0)*nelr];
 	//variables[i + (VAR_MOMENTUM+1)*nelr] = old_variables[i + (VAR_MOMENTUM+1)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+1)*nelr];	
 	//variables[i + (VAR_MOMENTUM+2)*nelr] = old_variables[i + (VAR_MOMENTUM+2)*nelr] + factor*fluxes[i + (VAR_MOMENTUM+2)*nelr];	
-	variables[dAdd(i, dMul(VAR_DENSITY, nelr))] = old_variables[dAdd(i, dMul(VAR_DENSITY, nelr))] + factor*fluxes[dAdd(i, dMul(VAR_DENSITY, nelr))];
-	variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] = old_variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] + factor*fluxes[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))];
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))];
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))];	
-	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] = old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] + factor*fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))];	
+	variables[dAdd(i, dMul(VAR_DENSITY, nelr))] = dAdd(old_variables[dAdd(i, dMul(VAR_DENSITY, nelr))], dMul(factor, fluxes[dAdd(i, dMul(VAR_DENSITY, nelr))]));
+	variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))] = dAdd(old_variables[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))], dMul(factor, fluxes[dAdd(i, dMul(VAR_DENSITY_ENERGY, nelr))]));
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 0), nelr))]));
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 1), nelr))]));	
+	variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))] = dAdd(old_variables[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))], dMul(factor, fluxes[dAdd(i, dMul(dAdd(VAR_MOMENTUM, 2), nelr))]));	
 }
 void time_step(int j, int nelr, float* old_variables, float* variables, float* step_factors, float* fluxes)
 {
@@ -766,14 +766,14 @@ int main(int argc, char** argv)
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(float)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
 
 	StopWatchInterface *timer = NULL;
 	sdkCreateTimer(&timer);
-	sdkStartTimer(&timer);
+	sdkStartTimer(timer);
 
 	cudaError_t error;
 	// Begin iterations
@@ -820,10 +820,10 @@ int main(int argc, char** argv)
 	      }
 	  }
 
-	cudaThreadSynchronize();
-	sdkStopTimer(&timer);  
+	cudaDeviceSynchronize();
+	sdkStopTimer(timer);  
 
-	std::cout  << (sdkGetAverageTimerValue(&timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
+	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
 
 	std::cout << "Saving solution..." << std::endl;
 	dump(variables, nel, nelr);

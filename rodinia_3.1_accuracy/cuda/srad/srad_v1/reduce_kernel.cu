@@ -1,6 +1,6 @@
 // statistical kernel
-#include "diversity.cuh"
-#include "converters.cuh"
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
 __global__ void reduce(	long d_Ne,											// number of elements in array
 										int d_no,											// number of sums to reduce
 										int d_mul,											// increment

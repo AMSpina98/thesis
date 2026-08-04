@@ -36,7 +36,7 @@
 #include "graphics.c"
 #include "resize.c"
 #include "timer.c"
-#include "./../compare_utils.cuh"
+#include "../compare_utils.cuh"
 
 #include "device.c"				// (in library path specified to compiler)	needed by for device functions
 

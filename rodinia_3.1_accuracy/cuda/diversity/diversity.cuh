@@ -60,21 +60,6 @@ __device__ T dAdd(T A, V B) {
 }
 
 
-template <typename T, typename V>
-__device__ T dSub(T A, V B){
-    float a = Converter<T>::to(A);
-    float b = Converter<V>::to(B);
-
-    float c = max(fabs(a), fabs(b));
-    if(c < 1.0f) c = 1.0f;
-    a = dDiv(a,c);
-    b = dDiv(b,c);
-    float result = __logf(__expf(a) / __expf(b));
-    result = dMul(result, c);
-    return Converter<T>::from(result);
-}
-
-
 #ifdef __cplusplus
 }
 #endif

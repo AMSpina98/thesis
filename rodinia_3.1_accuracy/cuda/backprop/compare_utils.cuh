@@ -2,7 +2,6 @@
 #include <string>
 #include <fstream>
 #include <cmath>
-#include "../common.h"	
 using namespace std;
 
 template <typename T>

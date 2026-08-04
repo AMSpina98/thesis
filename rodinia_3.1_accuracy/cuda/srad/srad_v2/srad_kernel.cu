@@ -1,5 +1,7 @@
 #include "srad.h"
 #include <stdio.h>
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
 
 __global__ void
 srad_cuda_1(
@@ -25,7 +27,7 @@ srad_cuda_1(
   
   //indices
   //int index   = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + cols * ty + tx;
-  int index   = dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dMul(BLOCK_SIZE, bx)) + dAdd(dMul(cols, ty), tx));
+  int index   = dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dMul(BLOCK_SIZE, bx)), dAdd(dMul(cols, ty), tx));
   //int index_n = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + tx - cols;
   int index_n = dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dSub(dAdd(dMul(BLOCK_SIZE, bx), tx), cols));
   //int index_s = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + cols * BLOCK_SIZE + tx;
@@ -47,30 +49,35 @@ srad_cuda_1(
   __shared__ float  west[BLOCK_SIZE][BLOCK_SIZE];
 
   //load data to shared memory
-  north[ty][tx] = J_cuda[index_n]; 
-  south[ty][tx] = J_cuda[index_s];
   if ( by == 0 ){
   //north[ty][tx] = J_cuda[BLOCK_SIZE * bx + tx]; 
   north[ty][tx] = J_cuda[dAdd(dMul(BLOCK_SIZE, bx), tx)]; 
-  }
-  //else if ( by == gridDim.y - 1 ){
-  else if ( by == dSub(gridDim.y, 1) ){
-  //south[ty][tx] = J_cuda[cols * BLOCK_SIZE * (gridDim.y - 1) + BLOCK_SIZE * bx + cols * ( BLOCK_SIZE - 1 ) + tx];
-  south[ty][tx] = J_cuda[dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), dSub(gridDim.y, 1)), dMul(BLOCK_SIZE, bx)), dAdd(dMul(cols, dSub(BLOCK_SIZE, 1)), tx))];
+  }else {
+    north[ty][tx] = J_cuda[index_n];
+ }
+  //if ( by == gridDim.y - 1 ){
+  if ( by == dSub(gridDim.y, 1) ){
+    //south[ty][tx] = J_cuda[cols * BLOCK_SIZE * (gridDim.y - 1) + BLOCK_SIZE * bx + cols * ( BLOCK_SIZE - 1 ) + tx];
+    south[ty][tx] = J_cuda[dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), dSub(gridDim.y, 1)), dMul(BLOCK_SIZE, bx)), dAdd(dMul(cols, dSub(BLOCK_SIZE, 1)), tx))];
+  }else{
+    //north[ty][tx] = J_cuda[index_n]; 
+    south[ty][tx] = J_cuda[index_s];
   }
    __syncthreads();
  
-  west[ty][tx] = J_cuda[index_w];
-  east[ty][tx] = J_cuda[index_e];
 
   if ( bx == 0 ){
   //west[ty][tx] = J_cuda[cols * BLOCK_SIZE * by + cols * ty]; 
   west[ty][tx] = J_cuda[dAdd(dMul(cols, dMul(BLOCK_SIZE, by)), dMul(cols, ty))]; 
+  }else{
+    west[ty][tx] = J_cuda[index_w];
   }
   //else if ( bx == gridDim.x - 1 ){
-  else if ( bx == dSub(gridDim.x, 1) ){
+  if ( bx == dSub(gridDim.x, 1) ){
   //east[ty][tx] = J_cuda[cols * BLOCK_SIZE * by + BLOCK_SIZE * ( gridDim.x - 1) + cols * ty + BLOCK_SIZE-1];
   east[ty][tx] = J_cuda[dAdd(dAdd(dMul(cols, dMul(BLOCK_SIZE, by)), dMul(BLOCK_SIZE, dSub(gridDim.x, 1))), dAdd(dMul(cols, ty), dSub(BLOCK_SIZE, 1)))];
+  }else{
+    east[ty][tx] = J_cuda[index_e];
   }
  
   __syncthreads();
@@ -373,24 +380,29 @@ o_srad_cuda_1(
   __shared__ float  west[BLOCK_SIZE][BLOCK_SIZE];
 
   //load data to shared memory
-  north[ty][tx] = J_cuda[index_n]; 
-  south[ty][tx] = J_cuda[index_s];
   if ( by == 0 ){
   north[ty][tx] = J_cuda[BLOCK_SIZE * bx + tx]; 
   }
-  else if ( by == gridDim.y - 1 ){
-  south[ty][tx] = J_cuda[cols * BLOCK_SIZE * (gridDim.y - 1) + BLOCK_SIZE * bx + cols * ( BLOCK_SIZE - 1 ) + tx];
+  else{
+    north[ty][tx] = J_cuda[index_n]; 
+  }
+  if ( by == gridDim.y - 1 ){
+    south[ty][tx] = J_cuda[cols * BLOCK_SIZE * (gridDim.y - 1) + BLOCK_SIZE * bx + cols * ( BLOCK_SIZE - 1 ) + tx];
+  }else{
+    south[ty][tx] = J_cuda[index_s];
   }
    __syncthreads();
  
-  west[ty][tx] = J_cuda[index_w];
-  east[ty][tx] = J_cuda[index_e];
-
+ 
   if ( bx == 0 ){
   west[ty][tx] = J_cuda[cols * BLOCK_SIZE * by + cols * ty]; 
+  }else{  
+    west[ty][tx] = J_cuda[index_w];
   }
-  else if ( bx == gridDim.x - 1 ){
-  east[ty][tx] = J_cuda[cols * BLOCK_SIZE * by + BLOCK_SIZE * ( gridDim.x - 1) + cols * ty + BLOCK_SIZE-1];
+  if ( bx == gridDim.x - 1 ){
+    east[ty][tx] = J_cuda[cols * BLOCK_SIZE * by + BLOCK_SIZE * ( gridDim.x - 1) + cols * ty + BLOCK_SIZE-1];
+  }else{
+    east[ty][tx] = J_cuda[index_e];
   }
  
   __syncthreads();

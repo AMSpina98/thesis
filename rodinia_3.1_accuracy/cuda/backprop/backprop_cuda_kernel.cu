@@ -232,11 +232,4 @@ __global__ void o_bpnn_adjust_weights_cuda(float * delta,
 }
 
 
-
-
-
-
-
-
-
 #endif 

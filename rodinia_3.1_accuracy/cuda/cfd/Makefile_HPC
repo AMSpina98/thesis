@@ -1,0 +1,90 @@
+# Compiler
+CUD_C = nvcc
+
+# CUDA
+CUDA_LIB = -lcuda -lcudart
+CUDA_FLAG = -gencode arch=compute_70,code=sm_70 \
+            -gencode arch=compute_80,code=sm_80 \
+            -gencode arch=compute_90,code=sm_90
+
+# Optional includes
+CUDA_INC = -I../../cuda/diversity
+
+# Optimization
+OPT = -O3
+
+
+all: euler3d euler3d_double pre_euler3d pre_euler3d_double
+
+
+# ============================================================
+# Executables
+# ============================================================
+
+euler3d: euler3d.o
+	$(CUD_C) euler3d.o \
+		$(CUDA_LIB) \
+		-o euler3d
+
+
+euler3d_double: euler3d_double.o
+	$(CUD_C) euler3d_double.o \
+		$(CUDA_LIB) \
+		-o euler3d_double
+
+
+pre_euler3d: pre_euler3d.o
+	$(CUD_C) pre_euler3d.o \
+		$(CUDA_LIB) \
+		-o pre_euler3d
+
+
+pre_euler3d_double: pre_euler3d_double.o
+	$(CUD_C) pre_euler3d_double.o \
+		$(CUDA_LIB) \
+		-o pre_euler3d_double
+
+
+# ============================================================
+# Objects
+# ============================================================
+
+euler3d.o: euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v \
+		$(CUDA_FLAG) \
+		$(CUDA_INC) \
+		-c euler3d.cu \
+		-o euler3d.o
+
+
+euler3d_double.o: euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v \
+		$(CUDA_FLAG) \
+		$(CUDA_INC) \
+		-c euler3d_double.cu \
+		-o euler3d_double.o
+
+
+pre_euler3d.o: pre_euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v \
+		$(CUDA_FLAG) \
+		$(CUDA_INC) \
+		-c pre_euler3d.cu \
+		-o pre_euler3d.o
+
+
+pre_euler3d_double.o: pre_euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v \
+		$(CUDA_FLAG) \
+		$(CUDA_INC) \
+		-c pre_euler3d_double.cu \
+		-o pre_euler3d_double.o
+
+
+clean:
+	rm -f *.o \
+	      euler3d \
+	      euler3d_double \
+	      pre_euler3d \
+	      pre_euler3d_double \
+	      *.linkinfo

@@ -2,12 +2,16 @@
 // This code is from the AIAA-2009-4001 paper
 
 //#include <cutil.h>
-#include <helper_cuda.h>
-#include <helper_timer.h>
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include "diversity.cuh"
 #include "converters.cuh"
+#include "cuda_compat.h"
+#include <string>
+#include <string_view>
+
+using namespace std;
 
  
  
@@ -792,13 +796,13 @@ void original_time_step(int j, int nelr, float* old_variables, float* variables,
 
 
 struct Error_data{
-	double max_abs = 0.0f;
-	double max_rel = 0.0f;
+	double max_abs = 0.0;
+	double max_rel = 0.0;
 	int max_index = -1;
 	int max_rel_index = -1;
 	int error_count  = 0;
-	double avg_err = 0.0f;
-	double RMSE = 0.0f;
+	double avg_err = 0.0;
+	double RMSE = 0.0;
 };
 
 struct Result_data{
@@ -819,7 +823,7 @@ void compute_error(Error_data& error, std::vector<float> &v, std::vector<float> 
 {
 	double o_value = ov[index + ofset*nelr];
 	double err = fabs(v[index + ofset*nelr] - o_value);
-	double rel_err = err / std::max(fabs(o_value), 1e-20f);
+	double rel_err = err / std::max(fabs(o_value), 1e-20);
 	if(err > error.max_abs)
 	{
 		error.max_abs = err;
@@ -845,7 +849,7 @@ void finalize_error(Error_data& error, int nelr)
 	error.RMSE = sqrt(error.RMSE);
 }
 
-void write_error_row(std::ofstream &file, string &field_name, const Error_data &e)
+void write_error_row(std::ofstream &file, std::string_view field_name, const Error_data &e)
 {
     file << field_name << ","
          << e.max_abs << ","
@@ -929,6 +933,23 @@ void compare(float* variables, float* original_variables, float* fluxes, float* 
 	save_results(result, output_file);
 }
 
+
+void save_times(float step_factor_time, float o_step_factor_time, float flux_time, float o_flux_time, float time_step_time, float o_time_step_time, string &output_file){
+	std::ofstream file(output_file);
+    if (!file.is_open())
+    {
+        printf("ERROR: could not open %s for writing\n", output_file.c_str());
+        return;
+    }
+	float over_head_sf = ((step_factor_time - o_step_factor_time) / step_factor_time) * 100;
+	float over_head_f = ((flux_time - o_flux_time) / o_flux_time) * 100;
+	float over_head_ts = ((time_step_time - o_time_step_time) / o_time_step_time) * 100;
+
+	file << "time k1: " << step_factor_time << "\noriginal time k1: " << o_step_factor_time << "\noverhead k1: " << over_head_sf
+		<< "\ntime k2: " << flux_time << "\noriginal time k2: " << o_flux_time << "\noverhead k2: " << over_head_f
+		<< "\ntime k3: " << time_step_time << "\noriginal time k3: " << o_time_step_time << "\noverhead k3: " << over_head_ts << "\n";
+}
+
 /*
  * Main function
  */
@@ -1004,8 +1025,11 @@ int main(int argc, char** argv)
 	
 	// read in domain geometry
 	float* areas;
+	float* original_areas;
 	int* elements_surrounding_elements;
+	int* original_elements_surrounding_elements;
 	float* normals;
+	float* original_normals;
 	{
 		std::ifstream file(data_file_name);
 	
@@ -1015,7 +1039,6 @@ int main(int argc, char** argv)
 		float* h_areas = new float[nelr];
 		int* h_elements_surrounding_elements = new int[nelr*NNB];
 		float* h_normals = new float[nelr*NDIM*NNB];
-		float start_total = 0.0f;
 				
 		// read in data
 		for(int i = 0; i < nel; i++)
@@ -1049,17 +1072,17 @@ int main(int argc, char** argv)
 		}
 		
 		areas = alloc<float>(nelr);
-		float* original_areas = alloc<float>(nelr);
+		original_areas = alloc<float>(nelr);
 		upload<float>(areas, h_areas, nelr);
 		upload<float>(original_areas, h_areas, nelr);
 
 		elements_surrounding_elements = alloc<int>(nelr*NNB);
-		int* original_elements_surrounding_elements = alloc<int>(nelr*NNB);
+		original_elements_surrounding_elements = alloc<int>(nelr*NNB);
 		upload<int>(elements_surrounding_elements, h_elements_surrounding_elements, nelr*NNB);
 		upload<int>(original_elements_surrounding_elements, h_elements_surrounding_elements, nelr*NNB);
 
 		normals = alloc<float>(nelr*NDIM*NNB);
-		float* original_normals = alloc<float>(nelr*NDIM*NNB);
+		original_normals = alloc<float>(nelr*NDIM*NNB);
 		upload<float>(normals, h_normals, nelr*NDIM*NNB);
 		upload<float>(original_normals, h_normals, nelr*NDIM*NNB);
 				
@@ -1081,7 +1104,12 @@ int main(int argc, char** argv)
 	float* original_fluxes = alloc<float>(nelr*NVAR);
 	float* original_step_factors = alloc<float>(nelr); 
 
-	cudaEvent_t startStep, stopStep, startFlux, stopFlux, startTimeStep, stopTimeStep;
+	cudaEvent_t startE, stopE;
+    cudaEventCreate(&startE);
+    cudaEventCreate(&stopE);
+
+	float elapsed, elapsed_step_factor=0, o_elapsed_step_factor=0, elapsed_flux=0, o_elapsed_flux=0, elapsed_time_step=0, o_elapsed_time_step=0;
+	float avg_elapsed_step_factor, avg_o_elapsed_step_factor, avg_elapsed_flux, avg_o_elapsed_flux, avg_elapsed_time_step, avg_o_elapsed_time_step;
 
 	// make sure all memory is floatly allocated before we start timing
 	initialize_variables(nelr, old_variables);
@@ -1091,7 +1119,7 @@ int main(int argc, char** argv)
 	cudaMemset( (void*) step_factors, 0, sizeof(float)*nelr );
 	cudaMemset( (void*) original_step_factors, 0, sizeof(float)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
@@ -1102,11 +1130,10 @@ int main(int argc, char** argv)
 	// CUT_SAFE_CALL( cutCreateTimer( &timer));
 	// CUT_SAFE_CALL( cutStartTimer( timer));
 	sdkCreateTimer(&timer); 
-	sdkStartTimer(&timer); 
+	sdkStartTimer(timer); 
 	// Begin iterations
 	//Here we do the time stepping
 
-	Error_data results[3][iterations/CHECKPOINT];
 
 	
 	for(int i = 0; i < iterations; i++)
@@ -1114,18 +1141,33 @@ int main(int argc, char** argv)
 		copy<float>(old_variables, variables, nelr*NVAR);
 		
 		// for the first iteration we compute the time step
+		cudaEventRecord(startE);
 		compute_step_factor(nelr, variables, areas, step_factors);
+		cudaEventRecord(stopE);
+		cudaEventSynchronize(stopE);
+		cudaEventElapsedTime(&elapsed, startE, stopE);
+		elapsed_step_factor += elapsed;
 
 		getLastCudaError("compute_step_factor failed");
 
 		
 		for(int j = 0; j < RK; j++)
 		{
+            cudaEventRecord(startE);
 			compute_flux(nelr, elements_surrounding_elements, normals, variables, fluxes);
+			cudaEventRecord(stopE);
+			cudaEventSynchronize(stopE);
+			cudaEventElapsedTime(&elapsed, startE, stopE);
+			elapsed_flux +=elapsed;
 
 			getLastCudaError("compute_flux failed");	
 			
+            cudaEventRecord(startE);
 			time_step(j, nelr, old_variables, variables, step_factors, fluxes);
+			cudaEventRecord(stopE);
+			cudaEventSynchronize(stopE);
+			cudaEventElapsedTime(&elapsed, startE, stopE);
+			elapsed_time_step += elapsed;
 		
 			getLastCudaError("time_step failed");	
 			
@@ -1134,18 +1176,33 @@ int main(int argc, char** argv)
 
 		copy<float>(original_old_variables, original_variables, nelr*NVAR);
 		
+		cudaEventRecord(startE);
 		original_compute_step_factor(nelr, original_variables, original_areas, original_step_factors);
+		cudaEventRecord(stopE);
+		cudaEventSynchronize(stopE);
+		cudaEventElapsedTime(&elapsed, startE, stopE);
+		o_elapsed_step_factor += elapsed;
 
 		getLastCudaError("original_compute_step_factor failed");
 
 		
 		for(int j = 0; j < RK; j++)
 		{
+            cudaEventRecord(startE);
 			original_compute_flux(nelr, original_elements_surrounding_elements, original_normals, original_variables, original_fluxes);
+			cudaEventRecord(stopE);
+			cudaEventSynchronize(stopE);
+			cudaEventElapsedTime(&elapsed, startE, stopE);
+			o_elapsed_flux += elapsed;
 
 			getLastCudaError("original_compute_flux failed");	
 			
+            cudaEventRecord(startE);
 			original_time_step(j, nelr, original_old_variables, original_variables, original_step_factors, original_fluxes);
+			cudaEventRecord(stopE);
+			cudaEventSynchronize(stopE);
+			cudaEventElapsedTime(&elapsed, startE, stopE);
+			o_elapsed_time_step += elapsed;
 		
 			getLastCudaError("original_time_step failed");	
 		}
@@ -1154,16 +1211,26 @@ int main(int argc, char** argv)
 		if((i + 1) % CHECKPOINT == 0){
 			std::cout << "Iteration: " << i + 1 << std::endl;
 			string filename = "results_iter_" + std::to_string((i + 1) / CHECKPOINT) + ".csv";
+			string filename_time = "times_iter_" + std::to_string((i + 1) / CHECKPOINT) + ".csv";
 			compare(variables, original_variables, fluxes, original_fluxes, step_factors, original_step_factors, nelr, filename);
+
+			avg_elapsed_step_factor = elapsed_step_factor/(i+1);
+			avg_elapsed_flux = elapsed_flux/(i+1);
+			avg_elapsed_time_step = elapsed_time_step/(i+1);
+			avg_o_elapsed_step_factor = o_elapsed_step_factor/(i+1);
+			avg_o_elapsed_flux = o_elapsed_flux/(i+1);
+			avg_o_elapsed_time_step = o_elapsed_time_step/(i+1);
+			save_times(avg_elapsed_step_factor, avg_o_elapsed_step_factor, avg_elapsed_flux, avg_o_elapsed_flux, avg_elapsed_time_step, avg_o_elapsed_time_step, filename_time);
+
 		}
 
 	}
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	//	CUT_SAFE_CALL( cutStopTimer(timer) );  
-	sdkStopTimer(&timer); 
+	sdkStopTimer(timer); 
 
-	std::cout  << (sdkGetAverageTimerValue(&timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
+	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
 
 
 	std::cout << "Saving solution..." << std::endl;
@@ -1172,6 +1239,9 @@ int main(int argc, char** argv)
 
 	
 	std::cout << "Cleaning up..." << std::endl;
+	
+	cudaEventDestroy(startE);
+	cudaEventDestroy(stopE);
 	dealloc<float>(areas);
 	dealloc<int>(elements_surrounding_elements);
 	dealloc<float>(normals);

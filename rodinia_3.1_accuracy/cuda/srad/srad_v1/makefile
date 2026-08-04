@@ -1,38 +1,18 @@
-include ../../../common/make.config
+NVCC = nvcc
 
-CC := $(CUDA_DIR)/bin/nvcc
+# GTX 1650 Ti -> Turing -> sm_75
+CUDA_FLAGS = -gencode arch=compute_75,code=sm_75
 
-INCLUDE := $(CUDA_DIR)/include
+NVCC_FLAGS = -O3 -std=c++17 $(CUDA_FLAGS)
 
-# Example
-# target: dependencies
-	# command 1
-	# command 2
-          # .
-          # .
-          # .
-	# command n
 
-# link objects(binaries) together
-a.out:		main.o
-	$(CC)	main.o \
-				-I$(INCLUDE) \
-				-L$(CUDA_LIB_DIR)  \
-				-lm -lcuda -lcudart -o srad
+all: srad.exe
 
-# compile main function file into object (binary)
-main.o: 	main.cu \
-				define.c \
-				graphics.c \
-				extract_kernel.cu \
-				prepare_kernel.cu \
-				reduce_kernel.cu \
-				srad_kernel.cu \
-				srad2_kernel.cu \
-				compress_kernel.cu
-	nvcc	main.cu \
-				-c -O3 -arch sm_35
+srad.exe: main.obj
+	$(NVCC) main.obj -o srad.exe
 
-# delete all object files
+main.obj: main.cu define.c graphics.c extract_kernel.cu prepare_kernel.cu reduce_kernel.cu srad_kernel.cu srad2_kernel.cu compress_kernel.cu
+	$(NVCC) $(NVCC_FLAGS) -c main.cu -o main.obj
+
 clean:
-	rm *.o srad
+	del /Q *.obj srad.exe 2>NUL

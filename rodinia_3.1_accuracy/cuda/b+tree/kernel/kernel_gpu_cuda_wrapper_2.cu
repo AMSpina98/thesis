@@ -86,7 +86,7 @@ kernel_gpu_cuda_wrapper_2(	knode *knodes,
 	//	INITIAL DRIVER OVERHEAD
 	//====================================================================================================100
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	//====================================================================================================100
 	//	EXECUTION PARAMETERS
@@ -321,7 +321,7 @@ kernel_gpu_cuda_wrapper_2(	knode *knodes,
 	cudaEventSynchronize(stopE);
 	float elapsed;
 	cudaEventElapsedTime(&elapsed, startE, stopE);
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	checkCUDAError("findRangeK");
 	
 	cudaEventRecord(startE);
@@ -341,7 +341,7 @@ kernel_gpu_cuda_wrapper_2(	knode *knodes,
 	cudaEventSynchronize(stopE);
 	float o_elapsed;
 	cudaEventElapsedTime(&o_elapsed, startE, stopE);
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	checkCUDAError("o_findRangeK");
 
 	time4 = get_time();

@@ -1,0 +1,58 @@
+# CUDA libraries (HPC module environment)
+
+# C compiler
+CC = gcc
+CC_FLAGS = -O3
+CUDA_LIB = -lcuda -lcudart
+
+# CUDA compiler
+NVCC = nvcc
+NVCC_FLAGS = -I../../cuda/diversity
+
+# CUDA architectures:
+# V100  -> sm_70
+# A100  -> sm_80
+# H200  -> sm_90
+CUDA_FLAGS = -gencode arch=compute_70,code=sm_70 \
+             -gencode arch=compute_80,code=sm_80 \
+             -gencode arch=compute_90,code=sm_90
+
+# Debug
+ifeq ($(dbg),1)
+	NVCC_FLAGS += -g -G -O0
+else
+	NVCC_FLAGS += -O3
+endif
+
+
+backprop: backprop.o facetrain.o imagenet.o backprop_cuda.o
+	$(NVCC) \
+		backprop.o facetrain.o imagenet.o backprop_cuda.o \
+		-o backprop \
+		-lcuda -lcudart -lm
+
+
+%.o: %.[ch]
+	$(CC) $(CC_FLAGS) $< -c
+
+
+facetrain.o: facetrain.c backprop.h
+	$(CC) $(CC_FLAGS) facetrain.c -c
+
+
+backprop.o: backprop.c backprop.h
+	$(CC) $(CC_FLAGS) backprop.c -c
+
+
+imagenet.o: imagenet.c backprop.h
+	$(CC) $(CC_FLAGS) imagenet.c -c
+
+
+backprop_cuda.o: backprop_cuda.cu backprop.h
+	$(NVCC) $(NVCC_FLAGS) $(CUDA_FLAGS) \
+		-c backprop_cuda.cu \
+		-o backprop_cuda.o
+
+
+clean:
+	rm -f *.o *~ backprop *.linkinfo
