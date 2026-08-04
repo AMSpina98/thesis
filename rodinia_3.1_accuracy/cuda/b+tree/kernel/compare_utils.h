@@ -1,7 +1,10 @@
+#pragma once
 #include <string>
 #include <fstream>
-#include "../common.h"	
+#include <cmath>
 using namespace std;
+#include "../common.h"	
+
 
 struct BTreeErrorData {
     int mismatch_count = 0;
@@ -25,6 +28,7 @@ struct BTreeResultData {
     double overhead_percent = 0.0;
 };
 
+
 struct BTreeResultData_2 {
 
     BTreeErrorData recstart;
@@ -40,15 +44,14 @@ struct BTreeResultData_2 {
     double overhead_percent = 0.0;
 };
 
+
 void compute_int_error(BTreeErrorData& error, long original, long redundant, int index);
 
 void finalize_int_error(BTreeErrorData& error, int count);
 
 void write_btree_error_row(std::ofstream& file, string name, const BTreeErrorData& e);
 
-
 void save_btree_results(const BTreeResultData& result, string filename);
-
 
 void compare_btree(
         long* offset,
@@ -62,32 +65,22 @@ void compare_btree(
         double redundant_time,
         string filename);
 
-        
 void save_btree_results_2(const BTreeResultData_2& result, string filename);
-
 
 void compare_btree_2(
         long* offset,
         long* o_offset,
-
         long* offset_2,
         long* o_offset_2,
-
         long* currKnode,
         long* o_currKnode,
-
         long* lastKnode,
         long* o_lastKnode,
-
         int* recstart,
         int* o_recstart,
-
         int* reclength,
         int* o_reclength,
-
         int count,
-
         double original_time,
         double redundant_time,
-
         string filename);

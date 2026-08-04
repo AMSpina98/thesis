@@ -1,9 +1,10 @@
-#include "./compare_utils.h"
+#include "compare_utils.h"
 #include <string>
 #include <fstream>
 #include <cmath>
 using namespace std;
-#include "../common.h"
+#include "../common.h"	
+
 
 void compute_int_error(BTreeErrorData& error, long original, long redundant, int index){
     long diff = labs(original - redundant);

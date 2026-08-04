@@ -1,11 +1,14 @@
 include ../../common/make.config
 
 CUDA_LIB =	-lcuda -lcudart
-CUDA_FLAG = -arch sm_53
+CUDA_FLAG = -gencode arch=compute_70,code=sm_70 \
+            -gencode arch=compute_80,code=sm_80 \
+            -gencode arch=compute_90,code=sm_90
 
 CUDA_INC = -I../../cuda/diversity
 
-CUDA_LIB_DIR = /usr/local/cuda/lib64
+CUD_C = nvcc
+
 
 # ====================================================================================================100
 #	END
@@ -64,7 +67,7 @@ C_C = gcc
 #	NVCC
 # ====================================================================================================100
 
-CUD_C = /usr/local/cuda/bin/nvcc
+CUD_C = nvcc
 # OMP_FLAG = 	-Xcompiler paste_one_here
 
 # ====================================================================================================100
@@ -89,25 +92,25 @@ CUD_C = /usr/local/cuda/bin/nvcc
 #	EXECUTABLES (LINK OBJECTS TOGETHER INTO BINARY)
 # ========================================================================================================================================================================================================200
 
-b+tree.out:	./main.o \
+b+tree.out: ./main.o \
+        ./kernel/kernel_gpu_cuda_wrapper.o \
+        ./kernel/kernel_gpu_cuda_wrapper_2.o \
+        ./kernel/compare_utils.o \
+        ./util/timer/timer.o \
+        ./util/num/num.o \
+        ./util/cuda/cuda.o
+	$(CUD_C) \
+		./main.o \
 		./kernel/kernel_gpu_cuda_wrapper.o \
 		./kernel/kernel_gpu_cuda_wrapper_2.o \
+		./kernel/compare_utils.o \
 		./util/timer/timer.o \
 		./util/num/num.o \
 		./util/cuda/cuda.o \
-		./kernel/compare_utils.o
-		$(CUD_C) \
-			./main.o \
-			./kernel/kernel_gpu_cuda_wrapper.o \
-			./kernel/kernel_gpu_cuda_wrapper_2.o \
-			./kernel/compare_utils.o \
-			./util/timer/timer.o \
-			./util/num/num.o \
-			./util/cuda/cuda.o \
-			-lm \
-			-L$(CUDA_LIB_DIR) \
-			$(CUDA_LIB)\
-            -o b+tree.out
+		-lm \
+		-L$(CUDA_LIB_DIR) \
+		$(CUDA_LIB) \
+		-o b+tree.out
 
 
 # ========================================================================================================================================================================================================200
@@ -150,6 +153,16 @@ main.o:	./common.h \
 				$(CUDA_FLAG) \
 				$(CUDA_INC)
 
+./kernel/compare_utils.o:	./common.h \
+							./kernel/compare_utils.h \
+							./kernel/compare_utils.cu
+	$(CUD_C) $(KERNEL_DIM) ./kernel/compare_utils.cu \
+				-c \
+				-o ./kernel/compare_utils.o \
+				-O3 \
+				$(CUDA_FLAG) \
+				$(CUDA_INC)
+
 # ======================================================================================================================================================150
 #	UTILITIES
 # ======================================================================================================================================================150
@@ -180,12 +193,6 @@ main.o:	./common.h \
 				$(CUDA_FLAG) \
 				$(CUDA_INC)
 
-./kernel/compare_utils.o: ./kernel/compare_utils.cu ./kernel/compare_utils.h
-		$(CUD_C) ./kernel/compare_utils.cu \
-			-c \
-			-o ./kernel/compare_utils.o \
-			-O3 \
-			$(CUDA_FLAG)
 
 # ======================================================================================================================================================150
 #	END
@@ -196,8 +203,7 @@ main.o:	./common.h \
 # ========================================================================================================================================================================================================200
 
 clean:
-	rm	-f
-		*.o *.out \
+	rm	-f *.o *.out \
 		./kernel/*.o \
 		./kernel/btree_results*.csv \
 		./util/timer/*.o \
