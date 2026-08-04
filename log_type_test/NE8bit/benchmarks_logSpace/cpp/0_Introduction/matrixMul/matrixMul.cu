@@ -46,7 +46,7 @@
 // CUDA runtime
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
-#include "./NL_type.cuh"
+#include "./NE_type.cuh"
 
 // Helper functions and utilities to work with CUDA
 #include <helper_cuda.h>
@@ -56,7 +56,7 @@
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
  * wA is A's width and wB is B's width
  */
-template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(NL *C, NL *A, NL *B, int wA, int wB)
+template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(NE *C, NE *A, NE *B, int wA, int wB)
 {
     // Block index
     int bx = blockIdx.x;
@@ -83,18 +83,18 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(NL *C, NL *A, NL *B, int
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
-    NL Csub = 0;
+    NE Csub = 0;
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
     for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep) {
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
-        __shared__ NL As[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ NE As[BLOCK_SIZE][BLOCK_SIZE];
 
         // Declaration of the shared memory array Bs used to
         // store the sub-matrix of B
-        __shared__ NL Bs[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ NE Bs[BLOCK_SIZE][BLOCK_SIZE];
 
         // Load the matrices from device memory
         // to shared memory; each thread loads
@@ -126,7 +126,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(NL *C, NL *A, NL *B, int
     C[c + wB * ty + tx] = Csub;
 }
 
-void ConstantInit(NL *data, int size, NL val)
+void ConstantInit(NE *data, int size, NE val)
 {
     for (int i = 0; i < size; ++i) {
         data[i] = val;
@@ -140,27 +140,27 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 {
     // Allocate host memory for matrices A and B
     unsigned int size_A     = dimsA.x * dimsA.y;
-    unsigned int mem_size_A = sizeof(NL) * size_A;
-    NL       *h_A;
+    unsigned int mem_size_A = sizeof(NE) * size_A;
+    NE       *h_A;
     checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
     unsigned int size_B     = dimsB.x * dimsB.y;
-    unsigned int mem_size_B = sizeof(NL) * size_B;
-    NL       *h_B;
+    unsigned int mem_size_B = sizeof(NE) * size_B;
+    NE       *h_B;
     checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
     cudaStream_t stream;
 
     // Initialize host memory
-    const NL valB = 0.01f;
+    const NE valB = 0.01f;
     ConstantInit(h_A, size_A, 1.0f);
     ConstantInit(h_B, size_B, valB);
 
     // Allocate device memory
-    NL *d_A, *d_B, *d_C;
+    NE *d_A, *d_B, *d_C;
 
     // Allocate host matrix C
     dim3         dimsC(dimsB.x, dimsA.y, 1);
-    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(NL);
-    NL       *h_C;
+    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(NE);
+    NE       *h_C;
     checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
 
     if (h_C == NULL) {

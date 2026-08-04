@@ -13,9 +13,9 @@
 #define HAS_FP8 0
 #endif
 
-struct NL;
+struct NE;
 
-namespace NLFormat {
+namespace NEFormat {
     constexpr int SIGN_BITS = 1;
     constexpr int MANTISSA_LENGTH = 7;
     constexpr double BASE = 2.0;;
@@ -27,7 +27,7 @@ namespace NLFormat {
     constexpr float INV_LOG_BASE = 1.4426950408889634f;
 }
 
-namespace NLMath {
+namespace NEMath {
 
     __host__ __device__ inline float Log(float x) {
     #ifdef __CUDA_ARCH__
@@ -96,19 +96,26 @@ namespace NLMath {
 }
 
 
-struct NL {
+struct NE {
     uint8_t value;
 
-    __host__ __device__ NL() : value(0) {}
-    __host__ __device__ NL(uint8_t v) : value(v) {}
+    __host__ __device__ NE() : value(0) {}
+    __host__ __device__ NE(uint8_t v) : value(v) {}
+
+    
+    __host__ __device__ NE(float x);
+    __host__ __device__ NE(double x);
+    __host__ __device__ NE(int x);
+
+
     __host__ __device__ operator uint8_t() const { return value; }
 
-    __host__ __device__ NL operator+(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator+(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        uint8_t mantissaTempA = NLMath::Max(mantissaA, mantissaB);
+        uint8_t mantissaTempA = NEMath::Max(mantissaA, mantissaB);
         uint8_t mantissaTempB;
         if(mantissaA == mantissaTempA){
             mantissaTempB = mantissaB;
@@ -119,21 +126,21 @@ struct NL {
             signB = temp;
         }
         if(signA == signB){
-            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NLFormat::MANTISSA_LENGTH;
-            if(mantissa>NLFormat::MAX_MANTISSA) mantissa=NLFormat::MAX_MANTISSA;
-            return NL((signA << 7) | mantissa);
+            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NEFormat::MANTISSA_LENGTH;
+            if(mantissa>NEFormat::MAX_MANTISSA) mantissa=NEFormat::MAX_MANTISSA;
+            return NE(static_cast<uint8_t>((signA << 7) | mantissa));
         } else{
-            uint64_t mantissa = (((uint64_t)mantissaTempB << NLFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
-            return NL((signB << 7) | mantissa);
+            uint64_t mantissa = (((uint64_t)mantissaTempB << NEFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
+            return NE(static_cast<uint8_t>((signB << 7) | mantissa));
         }
     }
 
-    __host__ __device__ NL operator+=(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator+=(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        uint8_t mantissaTempA = NLMath::Max(mantissaA, mantissaB);
+        uint8_t mantissaTempA = NEMath::Max(mantissaA, mantissaB);
         uint8_t mantissaTempB;
         if(mantissaA == mantissaTempA){
             mantissaTempB = mantissaB;
@@ -144,21 +151,21 @@ struct NL {
             signB = temp;
         }
         if(signA == signB){
-            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NLFormat::MANTISSA_LENGTH;
-            if(mantissa>NLFormat::MAX_MANTISSA) mantissa=NLFormat::MAX_MANTISSA;
-            return NL((signA << 7) | mantissa);
+            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NEFormat::MANTISSA_LENGTH;
+            if(mantissa>NEFormat::MAX_MANTISSA) mantissa=NEFormat::MAX_MANTISSA;
+            return NE(static_cast<uint8_t>((signA << 7) | mantissa));
         } else{
-            uint64_t mantissa = (((uint64_t)mantissaTempB << NLFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
-            return NL((signB << 7) | mantissa);
+            uint64_t mantissa = (((uint64_t)mantissaTempB << NEFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
+            return NE(static_cast<uint8_t>((signB << 7) | mantissa));
         }
     }
 
-    __host__ __device__ NL operator-(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator-(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = ((other.value >> 7) & 0x1) ^ 0x1;
-        uint8_t mantissaTempA = NLMath::Max(mantissaA, mantissaB);
+        uint8_t mantissaTempA = NEMath::Max(mantissaA, mantissaB);
         uint8_t mantissaTempB;
         if(mantissaA == mantissaTempA){
             mantissaTempB = mantissaB;
@@ -169,21 +176,21 @@ struct NL {
             signB = temp;
         }
         if(signA == signB){
-            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NLFormat::MANTISSA_LENGTH;
-            if(mantissa>NLFormat::MAX_MANTISSA) mantissa=NLFormat::MAX_MANTISSA;
-            return NL((signA << 7) | mantissa);
+            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NEFormat::MANTISSA_LENGTH;
+            if(mantissa>NEFormat::MAX_MANTISSA) mantissa=NEFormat::MAX_MANTISSA;
+            return NE(static_cast<uint8_t>((signA << 7) | mantissa));
         } else{
-            uint64_t mantissa = (((uint64_t)mantissaTempB << NLFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
-            return NL((signB << 7) | mantissa);
+            uint64_t mantissa = (((uint64_t)mantissaTempB << NEFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
+            return NE(static_cast<uint8_t>((signB << 7) | mantissa));
         }
     }
 
-    __host__ __device__ NL operator-=(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator-=(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = ((other.value >> 7) & 0x1) ^ 0x1;
-        uint8_t mantissaTempA = NLMath::Max(mantissaA, mantissaB);
+        uint8_t mantissaTempA = NEMath::Max(mantissaA, mantissaB);
         uint8_t mantissaTempB;
         if(mantissaA == mantissaTempA){
             mantissaTempB = mantissaB;
@@ -194,69 +201,69 @@ struct NL {
             signB = temp;
         }
         if(signA == signB){
-            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NLFormat::MANTISSA_LENGTH;
-            if(mantissa>NLFormat::MAX_MANTISSA) mantissa=NLFormat::MAX_MANTISSA;
-            return NL((signA << 7) | mantissa);
+            uint64_t mantissa = ((uint64_t)mantissaTempA * (uint64_t)mantissaTempB) >> NEFormat::MANTISSA_LENGTH;
+            if(mantissa>NEFormat::MAX_MANTISSA) mantissa=NEFormat::MAX_MANTISSA;
+            return NE(static_cast<uint8_t>((signA << 7) | mantissa));
         } else{
-            uint64_t mantissa = (((uint64_t)mantissaTempB << NLFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
-            return NL((signB << 7) | mantissa);
+            uint64_t mantissa = (((uint64_t)mantissaTempB << NEFormat::MANTISSA_LENGTH) / (uint64_t)mantissaTempA);
+            return NE(static_cast<uint8_t>((signB << 7) | mantissa));
         }
     }
 
-    __host__ __device__ NL operator*(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator*(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        float xa = (NLMath::Log((float)mantissaA) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
-        float xb = (NLMath::Log((float)mantissaB) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
+        float xa = (NEMath::Log((float)mantissaA) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
+        float xb = (NEMath::Log((float)mantissaB) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
         float xc = xa * xb;
-        float I = NLMath::Exp(- xc * NLFormat::LOG_BASE) * NLFormat::MANTISSA_SCALE;
-        uint8_t mantissaC = NLMath::NearbyUInt(I);
-        if(mantissaC > NLFormat::MAX_MANTISSA) mantissaC = NLFormat::MAX_MANTISSA;
-        return NL(((signA ^ signB) << 7) | mantissaC);
+        float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
+        uint8_t mantissaC = NEMath::NearbyUInt(I);
+        if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((signA ^ signB) << 7) | mantissaC);
     }
 
-    __host__ __device__ NL operator*=(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator*=(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        float xa = (NLMath::Log((float)mantissaA) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
-        float xb = (NLMath::Log((float)mantissaB) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
+        float xa = (NEMath::Log((float)mantissaA) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
+        float xb = (NEMath::Log((float)mantissaB) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
         float xc = xa * xb;
-        float I = NLMath::Exp(- xc * NLFormat::LOG_BASE) * NLFormat::MANTISSA_SCALE;
-        uint8_t mantissaC = NLMath::NearbyUInt(I);
-        if(mantissaC > NLFormat::MAX_MANTISSA) mantissaC = NLFormat::MAX_MANTISSA;
-        return NL(((signA ^ signB) << 7) | mantissaC);
+        float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
+        uint8_t mantissaC = NEMath::NearbyUInt(I);
+        if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((((signA ^ signB) << 7) | mantissaC)));
     }
 
-    __host__ __device__ NL operator/(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator/(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        float xa = (NLMath::Log((float)mantissaA) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
-        float xb = (NLMath::Log((float)mantissaB) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
+        float xa = (NEMath::Log((float)mantissaA) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
+        float xb = (NEMath::Log((float)mantissaB) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
         float xc = xa / xb;
-        float I = NLMath::Exp(- xc * NLFormat::LOG_BASE) * NLFormat::MANTISSA_SCALE;
-        uint8_t mantissaC = NLMath::NearbyUInt(I);
-        if(mantissaC > NLFormat::MAX_MANTISSA) mantissaC = NLFormat::MAX_MANTISSA;
-        return NL(((signA ^ signB) << 7) | mantissaC);
+        float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
+        uint8_t mantissaC = NEMath::NearbyUInt(I);
+        if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((((signA ^ signB) << 7) | mantissaC)));
     }
 
-    __host__ __device__ NL operator/=(const NL& other) const {
-        uint8_t mantissaA = (value & NLFormat::MAX_MANTISSA);
-        uint8_t mantissaB = (other.value & NLFormat::MAX_MANTISSA);
+    __host__ __device__ NE operator/=(const NE& other) const {
+        uint8_t mantissaA = (value & NEFormat::MAX_MANTISSA);
+        uint8_t mantissaB = (other.value & NEFormat::MAX_MANTISSA);
         uint8_t signA = (value >> 7) & 0x1;
         uint8_t signB = (other.value >> 7) & 0x1;
-        float xa = (NLMath::Log((float)mantissaA) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
-        float xb = (NLMath::Log((float)mantissaB) - NLFormat::MANTISSA_FACTOR) * NLFormat::INV_LOG_BASE;
+        float xa = (NEMath::Log((float)mantissaA) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
+        float xb = (NEMath::Log((float)mantissaB) - NEFormat::MANTISSA_FACTOR) * NEFormat::INV_LOG_BASE;
         float xc = xa / xb;
-        float I = NLMath::Exp(- xc * NLFormat::LOG_BASE) * NLFormat::MANTISSA_SCALE;
-        uint8_t mantissaC = NLMath::NearbyUInt(I);
-        if(mantissaC > NLFormat::MAX_MANTISSA) mantissaC = NLFormat::MAX_MANTISSA;
-        return NL(((signA ^ signB) << 7) | mantissaC);
+        float I = NEMath::Exp(- xc * NEFormat::LOG_BASE) * NEFormat::MANTISSA_SCALE;
+        uint8_t mantissaC = NEMath::NearbyUInt(I);
+        if(mantissaC > NEFormat::MAX_MANTISSA) mantissaC = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((((signA ^ signB) << 7) | mantissaC)));
     }
 };
 
@@ -265,66 +272,66 @@ struct NL {
 //Converter
 template<typename T>
 struct Converter{
-	__host__ __device__ static NL to(T x);
-	__host__ __device__ static T from(NL x);
+	__host__ __device__ static NE to(T x);
+	__host__ __device__ static T from(NE x);
 };
 
 
 template<>
 struct Converter<int> {
-    __host__ __device__ static NL to(int x){
+    __host__ __device__ static NE to(int x){
         uint32_t sign = (x < 0);
-        float ax = NLMath::Abs(x);
-        float I = NLMath::Exp(-ax * NLFormat::LOG_BASE);
-        uint32_t mantissa = NLMath::NearbyUInt(I * NLFormat::MANTISSA_SCALE);
-        if (mantissa > NLFormat::MAX_MANTISSA) mantissa = NLFormat::MAX_MANTISSA;
-        return NL((sign << 7) |  mantissa);
+        float ax = NEMath::Abs(x);
+        float I = NEMath::Exp(-ax * NEFormat::LOG_BASE);
+        uint32_t mantissa = NEMath::NearbyUInt(I * NEFormat::MANTISSA_SCALE);
+        if (mantissa > NEFormat::MAX_MANTISSA) mantissa = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((sign << 7) | mantissa));
     }
 
-    __host__ __device__ static int from(NL x){
+    __host__ __device__ static int from(NE x){
         uint32_t sign = (x >> 7) & 0x1;
-        int32_t mantissa = x & ((1u << NLFormat::MANTISSA_LENGTH) - 1);
-        float value = (NLFormat::MANTISSA_FACTOR - NLMath::Log((float)mantissa)) * NLFormat::INV_LOG_BASE;
+        int32_t mantissa = x & ((1u << NEFormat::MANTISSA_LENGTH) - 1);
+        float value = (NEFormat::MANTISSA_FACTOR - NEMath::Log((float)mantissa)) * NEFormat::INV_LOG_BASE;
         if (sign) value = -value;
-        return NLMath::NearbyInt(value);
+        return NEMath::NearbyInt(value);
     }
 };
 
 
 template<>
 struct Converter<unsigned int> {
-    __host__ __device__ static NL to(unsigned int x){
+    __host__ __device__ static NE to(unsigned int x){
         float ax = (float)x;
-        float I = NLMath::Exp(-ax * NLFormat::LOG_BASE);
-        uint32_t mantissa = NLMath::NearbyUInt(I * NLFormat::MANTISSA_SCALE);
-        mantissa = NLMath::Max(1u, mantissa);
-        mantissa = NLMath::Min(NLFormat::MAX_MANTISSA, mantissa);
-        return NL((0u << 7) | mantissa);
+        float I = NEMath::Exp(-ax * NEFormat::LOG_BASE);
+        uint32_t mantissa = NEMath::NearbyUInt(I * NEFormat::MANTISSA_SCALE);
+        mantissa = NEMath::Max(1u, mantissa);
+        mantissa = NEMath::Min(NEFormat::MAX_MANTISSA, mantissa);
+        return NE(static_cast<uint8_t>((0u << 7) | mantissa));
     }
 
 
-    __host__ __device__ static unsigned int from(NL x){
-        uint32_t mantissa = x & NLFormat::MAX_MANTISSA;
-        float value = (NLFormat::MANTISSA_FACTOR - NLMath::Log((float)mantissa)) * NLFormat::INV_LOG_BASE;
-        return NLMath::NearbyUInt(value);
+    __host__ __device__ static unsigned int from(NE x){
+        uint32_t mantissa = x & NEFormat::MAX_MANTISSA;
+        float value = (NEFormat::MANTISSA_FACTOR - NEMath::Log((float)mantissa)) * NEFormat::INV_LOG_BASE;
+        return NEMath::NearbyUInt(value);
     }
 };
 
 template<>
 struct Converter<double> {
-    __host__ __device__ static NL to(double x){
+    __host__ __device__ static NE to(double x){
         uint32_t sign = (x < 0.0);
-        double ax = NLMath::DAbs(x);
-        double I = NLMath::Exp(-ax * NLFormat::LOG_BASE);
-        uint32_t mantissa = NLMath::NearbyUInt(I * NLFormat::MANTISSA_SCALE);
-        if (mantissa > NLFormat::MAX_MANTISSA) mantissa = NLFormat::MAX_MANTISSA;
-        return NL((sign << 7) | mantissa);
+        double ax = NEMath::DAbs(x);
+        double I = NEMath::Exp(-ax * NEFormat::LOG_BASE);
+        uint32_t mantissa = NEMath::NearbyUInt(I * NEFormat::MANTISSA_SCALE);
+        if (mantissa > NEFormat::MAX_MANTISSA) mantissa = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((sign << 7) | mantissa));
     }
 
-    __host__ __device__ static double from(NL x) {
+    __host__ __device__ static double from(NE x) {
         uint32_t sign = (x >> 7) & 0x1;
-        int32_t mantissa = x & ((1u << NLFormat::MANTISSA_LENGTH) - 1);
-        double value = (NLFormat::MANTISSA_FACTOR - NLMath::Log((float)mantissa)) * NLFormat::INV_LOG_BASE;
+        int32_t mantissa = x & ((1u << NEFormat::MANTISSA_LENGTH) - 1);
+        double value = (NEFormat::MANTISSA_FACTOR - NEMath::Log((float)mantissa)) * NEFormat::INV_LOG_BASE;
         if (sign) value = -value;
         return value;
     }
@@ -332,31 +339,46 @@ struct Converter<double> {
 
 template<>
 struct Converter<float> {
-	__host__ __device__ static NL to(float x){
+	__host__ __device__ static NE to(float x){
         uint32_t sign = (x < 0.0);
-        float ax = NLMath::Abs(x);
-        float I = NLMath::Exp(-ax * NLFormat::LOG_BASE);
-        uint32_t mantissa = NLMath::NearbyUInt(I * NLFormat::MANTISSA_SCALE);
-        if (mantissa > NLFormat::MAX_MANTISSA) mantissa = NLFormat::MAX_MANTISSA;
-        return NL((sign << 7) | mantissa);
+        float ax = NEMath::Abs(x);
+        float I = NEMath::Exp(-ax * NEFormat::LOG_BASE);
+        uint32_t mantissa = NEMath::NearbyUInt(I * NEFormat::MANTISSA_SCALE);
+        if (mantissa > NEFormat::MAX_MANTISSA) mantissa = NEFormat::MAX_MANTISSA;
+        return NE(static_cast<uint8_t>((sign << 7) | mantissa));
 	}
-	__host__ __device__ static float from(NL x){
+	__host__ __device__ static float from(NE x){
         uint32_t sign = (x >> 7) & 0x1;
-        int32_t mantissa = x & ((1u << NLFormat::MANTISSA_LENGTH) - 1);
-        float value = (NLFormat::MANTISSA_FACTOR - NLMath::Log((float)mantissa)) * NLFormat::INV_LOG_BASE;
+        int32_t mantissa = x & ((1u << NEFormat::MANTISSA_LENGTH) - 1);
+        float value = (NEFormat::MANTISSA_FACTOR - NEMath::Log((float)mantissa)) * NEFormat::INV_LOG_BASE;
         if (sign) value = -value;
         return value;
 	}
 };
 
+__host__ __device__
+NE::NE(float x) {
+    *this = Converter<float>::to(x);
+}
+
+__host__ __device__
+NE::NE(double x) {
+    *this = Converter<double>::to(x);
+}
+
+__host__ __device__
+NE::NE(int x) {
+    *this = Converter<int>::to(x);
+}
+
 /*
-template<typename T> cudaError_t cudaMemcpyNL(
-    NL* dst,
+template<typename T> cudaError_t cudaMemcpyNE(
+    NE* dst,
     const T* src,
     size_t count,
     cudaMemcpyKind kind){
     if(kind == cudaMemcpyHostToDevice){
-        std::vector<NL> buffer(count);
+        std::vector<NE> buffer(count);
 
         for(size_t i=0;i<count;i++){
             buffer[i] = Converter<T>::to(src[i]);
@@ -365,7 +387,7 @@ template<typename T> cudaError_t cudaMemcpyNL(
         return cudaMemcpy(
             dst,
             buffer.data(),
-            count*sizeof(NL),
+            count*sizeof(NE),
             cudaMemcpyHostToDevice
         );
     }
@@ -374,8 +396,8 @@ template<typename T> cudaError_t cudaMemcpyNL(
 
 
 template<typename T>
-cudaError_t cudaMemcpyNLAsync(
-    NL* dst,
+cudaError_t cudaMemcpyNEAsync(
+    NE* dst,
     const T* src,
     size_t count,
     cudaMemcpyKind kind,
@@ -384,9 +406,9 @@ cudaError_t cudaMemcpyNLAsync(
     if(kind != cudaMemcpyHostToDevice)
         return cudaErrorInvalidMemcpyDirection;
 
-    NL* buffer;
+    NE* buffer;
     cudaError_t err =
-        cudaMallocHost(&buffer, count*sizeof(NL));
+        cudaMallocHost(&buffer, count*sizeof(NE));
     if(err != cudaSuccess)
         return err;
     for(size_t i=0;i<count;i++)
@@ -394,7 +416,7 @@ cudaError_t cudaMemcpyNLAsync(
     err = cudaMemcpyAsync(
         dst,
         buffer,
-        count*sizeof(NL),
+        count*sizeof(NE),
         cudaMemcpyHostToDevice,
         stream
     );
@@ -414,13 +436,13 @@ cudaError_t cudaMemcpyNLAsync(
 }
 
 template<typename T>
-__device__ void deviceConverter(NL* dst, const T* src, size_t count){
+__device__ void deviceConverter(NE* dst, const T* src, size_t count){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < count) dst[i] = Converter<T>::to(src[i]);
 }
 
 template<typename T>
-__device__ void deviceTranslator(T* dst, const NL* src, size_t count){
+__device__ void deviceTranslator(T* dst, const NE* src, size_t count){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < count) dst[i] = Converter<T>::from(src[i]);
 }
