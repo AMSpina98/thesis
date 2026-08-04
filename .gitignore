@@ -3,6 +3,7 @@
 *.out
 *.cubin
 *.ptx
+*.exe
 
 # Results
 *.csv
