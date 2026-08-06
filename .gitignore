@@ -15,3 +15,6 @@ slurm-*.out
 
 # temporary
 *.tmp
+
+#profiling
+*.ncu-rep
