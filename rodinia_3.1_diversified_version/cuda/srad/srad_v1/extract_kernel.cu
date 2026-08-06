@@ -1,6 +1,6 @@
 // statistical kernel
-#include "diversity.cuh"
-#include "converters.cuh"
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
 
 __global__ void extract(	long d_Ne,
 											fp *d_I){										// pointer to input image (DEVICE GLOBAL MEMORY)

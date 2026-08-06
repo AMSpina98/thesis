@@ -9,6 +9,8 @@
 #include "cuda.h"
 #include "diversity.cuh"
 #include "converters.cuh"
+#include "win_compat.h"
+#include "cuda_compat.h"
 
 
 __global__ void

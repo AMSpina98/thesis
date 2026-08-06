@@ -2,10 +2,10 @@
 // This code is from the AIAA-2009-4001 paper
 
 // #include <cutil.h>
-#include <helper_cuda.h>
-#include <helper_timer.h>
 #include <iostream>
 #include <fstream>
+#include "../diversity/cuda_compat.h"
+
 
 #if CUDART_VERSION < 3000
 struct double3
@@ -19,7 +19,7 @@ struct double3
  * 
  */ 
 #define GAMMA 1.4
-#define iterations 2000
+#define iterations 10
 #ifndef block_length
 	#define block_length 128
 #endif
@@ -530,7 +530,7 @@ int main(int argc, char** argv)
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(double)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
@@ -539,7 +539,7 @@ int main(int argc, char** argv)
 	StopWatchInterface *timer = NULL;
 
 	sdkCreateTimer( &timer);
-	sdkStartTimer( &timer);
+	sdkStartTimer( timer);
 
 	// Begin iterations
 	for(int i = 0; i < iterations; i++)
@@ -577,10 +577,10 @@ int main(int argc, char** argv)
 		  }
 	}
 
-	cudaThreadSynchronize();
-	sdkStopTimer(&timer);  
+	cudaDeviceSynchronize();
+	sdkStopTimer(timer);  
 
-	std::cout  << (sdkGetAverageTimerValue(&timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
+	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
 
 	std::cout << "Saving solution..." << std::endl;
 	dump(variables, nel, nelr);

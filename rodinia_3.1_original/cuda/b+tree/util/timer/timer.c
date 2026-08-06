@@ -1,3 +1,4 @@
+#include "../../../diversity/win_compat.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

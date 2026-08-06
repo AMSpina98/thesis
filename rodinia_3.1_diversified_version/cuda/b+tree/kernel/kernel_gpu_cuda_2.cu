@@ -64,7 +64,7 @@ findRangeK(	long height,
 
 	// Find the index of the ending record
 	if(knodesD[lastKnodeD[bid]].keys[thid] == endD[bid]){
-		ReclenD[bid] = dAdd(knodesD[lastKnodeD[bid]].indices[thid], dAdd(-RecstartD[bid],1));
+		ReclenD[bid] = dAdd(knodesD[lastKnodeD[bid]].indices[thid], dAdd(1, dMul(-1, RecstartD[bid])));
 	}
 
 }

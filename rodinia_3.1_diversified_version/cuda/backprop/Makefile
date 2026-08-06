@@ -1,46 +1,38 @@
-include ../../common/make.config
+# NMAKE Makefile per backprop (Windows, CUDA Toolkit + MSVC)
+# Lanciare da "x64 Native Tools Command Prompt for VS" cosi' cl.exe e nvcc
+# risultano entrambi nel PATH.
 
-CUDA_LIB_DIR = /usr/local/cuda/lib64
-# C compiler
-CC = gcc
-CC_FLAGS = -g  -O2
+CC = cl
+CC_FLAGS = /O2 /nologo /EHsc
 
-# CUDA compiler
-NVCC = $(CUDA_DIR)/bin/nvcc
-NVCC_FLAGS = -I$(CUDA_DIR)/include
-NVCC_FLAGS += -I../../cuda/diversity
+NVCC = nvcc
+NVCC_FLAGS = -I..\diversity
 
-# 'make dbg=1' enables NVCC debugging
-ifeq ($(dbg),1)
-	NVCC_FLAGS += -g -O0
-else
-	NVCC_FLAGS += -O2
-endif
+# GTX 1650 Ti -> Turing -> sm_75
+CUDA_FLAGS = -gencode arch=compute_75,code=sm_75
 
-# 'make emu=1' compiles the CUDA kernels for emulation
-ifeq ($(emu),1)
-	NVCC_FLAGS += -deviceemu
-endif
+!IFDEF dbg
+NVCC_FLAGS = $(NVCC_FLAGS) -g -G -O0
+!ELSE
+NVCC_FLAGS = $(NVCC_FLAGS) -O3 -std=c++17 --source-in-ptx -lineinfo
+!ENDIF
 
+all: backprop.exe
 
-backprop: backprop.o facetrain.o imagenet.o backprop_cuda.o 
-	$(CC) $(CC_FLAGS) backprop.o facetrain.o imagenet.o backprop_cuda.o -o backprop -L$(CUDA_LIB_DIR) -lcuda -lcudart -lm
+backprop.exe: backprop.obj facetrain.obj imagenet.obj backprop_cuda.obj
+	$(NVCC) backprop.obj facetrain.obj imagenet.obj backprop_cuda.obj -o backprop.exe
 
-%.o: %.[ch]
-	$(CC) $(CC_FLAGS) $< -c
+facetrain.obj: facetrain.c backprop.h
+	$(CC) $(CC_FLAGS) /c facetrain.c /Fofacetrain.obj
 
-facetrain.o: facetrain.c backprop.h
-	$(CC) $(CC_FLAGS) facetrain.c -c
-	
-backprop.o: backprop.c backprop.h
-	$(CC) $(CC_FLAGS) backprop.c -c
+backprop.obj: backprop.c backprop.h
+	$(CC) $(CC_FLAGS) /c backprop.c /Fobackprop.obj
 
-backprop_cuda.o: backprop_cuda.cu backprop.h
-	$(NVCC) $(NVCC_FLAGS) -c backprop_cuda.cu
+imagenet.obj: imagenet.c backprop.h
+	$(CC) $(CC_FLAGS) /c imagenet.c /Foimagenet.obj
 
-imagenet.o: imagenet.c backprop.h
-	$(CC) $(CC_FLAGS) imagenet.c -c
-
+backprop_cuda.obj: backprop_cuda.cu backprop.h
+	$(NVCC) $(NVCC_FLAGS) $(CUDA_FLAGS) -c backprop_cuda.cu -o backprop_cuda.obj
 
 clean:
-	rm -f *.o *~ backprop backprop_cuda.linkinfo
+	del /Q *.obj backprop.exe *.exp *.lib 2>NUL

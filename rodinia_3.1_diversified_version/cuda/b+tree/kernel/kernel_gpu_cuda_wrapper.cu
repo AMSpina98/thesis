@@ -1,3 +1,7 @@
+#include "../../diversity/converters.cuh"
+#include "../../diversity/cuda_compat.h"
+#include "../../diversity/diversity.cuh"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -77,7 +81,7 @@ kernel_gpu_cuda_wrapper(record *records,
 	//	INITIAL DRIVER OVERHEAD
 	//====================================================================================================100
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	//====================================================================================================100
 	//	EXECUTION PARAMETERS
@@ -225,7 +229,7 @@ kernel_gpu_cuda_wrapper(record *records,
 											offsetD,
 											keysD,
 											ansD);
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	checkCUDAError("findK");
 
 	time4 = get_time();

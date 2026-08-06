@@ -1,6 +1,9 @@
 #include "srad.h"
 #include <stdio.h>
 
+#include "../../diversity/diversity.cuh"
+#include "../../diversity/converters.cuh"
+
 __global__ void
 srad_cuda_1(
 		  float *E_C, 
@@ -25,7 +28,7 @@ srad_cuda_1(
   
   //indices
   //int index   = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + cols * ty + tx;
-  int index   = dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dMul(BLOCK_SIZE, bx)) + dAdd(dMul(cols, ty), tx));
+  int index   = dAdd(dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dMul(BLOCK_SIZE, bx)), dAdd(dMul(cols, ty), tx));
   //int index_n = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + tx - cols;
   int index_n = dAdd(dMul(dMul(cols, BLOCK_SIZE), by), dSub(dAdd(dMul(BLOCK_SIZE, bx), tx), cols));
   //int index_s = cols * BLOCK_SIZE * by + BLOCK_SIZE * bx + cols * BLOCK_SIZE + tx;

@@ -48,10 +48,9 @@ inline void sdkCreateTimer(StopWatchInterface **timer)
 {
     if (!timer) return;
 
-
     *timer = (StopWatchInterface*)malloc(sizeof(StopWatchInterface));
 
-	if (!(*timer)) return;
+    if (!(*timer)) return;
 
     cudaEventCreate(&((*timer)->start));
     cudaEventCreate(&((*timer)->stop));

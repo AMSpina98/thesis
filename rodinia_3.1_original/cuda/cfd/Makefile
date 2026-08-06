@@ -1,31 +1,55 @@
-include ../../common/make.config
+# NMAKE Makefile per CFD (Windows, CUDA Toolkit + MSVC)
+# Lanciare da "x64 Native Tools Command Prompt for VS" cosi' cl.exe e nvcc
+# risultano entrambi nel PATH.
 
-CUDA_SDK_PATH := $(SDK_DIR)
+CUD_C = nvcc
 
-# Determine the correct version of the cutil library
-CUTIL_LIB = # -lcutil
-ifeq ($(shell uname -m), x86_64)
-     ifeq ($(shell if test -e $(SDK_DIR)/lib/libcutil_x86_64.a; then echo T; else echo F; fi), T)
-        CUTIL_LIB = #-lcutil_x86_64
-     endif
-endif
+# Optional includes
+CUDA_INC = -I..\..\cuda\diversity
 
+# GTX 1650 Ti -> Turing -> sm_75
+CUDA_FLAG = -gencode arch=compute_75,code=sm_75
 
-all: euler3d euler3d_double  pre_euler3d  pre_euler3d_double 
-
-euler3d: euler3d.cu
-	nvcc $(KERNEL_DIM) -O2 -Xptxas -v --gpu-architecture=compute_20 --gpu-code=compute_20 euler3d.cu -o euler3d -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
-
-euler3d_double: euler3d_double.cu
-	nvcc -Xptxas -v -O3 --gpu-architecture=compute_20 --gpu-code=compute_20 euler3d_double.cu -o euler3d_double -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
+# Optimization + profiling support
+OPT = -O3 -std=c++17 --source-in-ptx -lineinfo
 
 
-pre_euler3d: pre_euler3d.cu
-	nvcc -Xptxas -v -O3 --gpu-architecture=compute_20 --gpu-code=compute_20 pre_euler3d.cu -o pre_euler3d -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
+all: euler3d.exe euler3d_double.exe pre_euler3d.exe pre_euler3d_double.exe
 
-pre_euler3d_double: pre_euler3d_double.cu
-	nvcc -Xptxas -v -O3 --gpu-architecture=compute_20 --gpu-code=compute_20 pre_euler3d_double.cu -o pre_euler3d_double -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
+
+# ============================================================
+# Executables
+# ============================================================
+
+euler3d.exe: euler3d.obj
+	$(CUD_C) euler3d.obj -o euler3d.exe
+
+euler3d_double.exe: euler3d_double.obj
+	$(CUD_C) euler3d_double.obj -o euler3d_double.exe
+
+pre_euler3d.exe: pre_euler3d.obj
+	$(CUD_C) pre_euler3d.obj -o pre_euler3d.exe
+
+pre_euler3d_double.exe: pre_euler3d_double.obj
+	$(CUD_C) pre_euler3d_double.obj -o pre_euler3d_double.exe
+
+
+# ============================================================
+# Objects
+# ============================================================
+
+euler3d.obj: euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c euler3d.cu -o euler3d.obj
+
+euler3d_double.obj: euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c euler3d_double.cu -o euler3d_double.obj
+
+pre_euler3d.obj: pre_euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c pre_euler3d.cu -o pre_euler3d.obj
+
+pre_euler3d_double.obj: pre_euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c pre_euler3d_double.cu -o pre_euler3d_double.obj
 
 
 clean:
-	rm -f euler3d euler3d_double pre_euler3d pre_euler3d_double *.linkinfo
+	del /Q *.obj euler3d.exe euler3d_double.exe pre_euler3d.exe pre_euler3d_double.exe *.exp *.lib 2>NUL

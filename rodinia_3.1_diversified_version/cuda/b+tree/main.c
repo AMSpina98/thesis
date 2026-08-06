@@ -62,6 +62,8 @@
 // #include <sys/time.h>							// (in directory known to compiler)			needed by ???
 #include <math.h>									// (in directory known to compiler)			needed by log, pow
 #include <string.h>									// (in directory known to compiler)			needed by memset
+#include <stdlib.h>
+
 
 //======================================================================================================================================================150
 //	COMMON
@@ -105,7 +107,7 @@
 knode *knodes;
 record *krecords;
 char *mem;
-long freeptr;
+char *freeptr;
 long malloc_size;
 long size;
 long maxheight;
@@ -282,10 +284,7 @@ list_insert_item_sorted(list_t *l,
   l->length++;
 }
 
-void 
-list_insert_head(	list_t *l, 
-					void *v)
-{
+void list_insert_head(	list_t *l, void *v){
   list_item_t *i;
   i = (list_item_t *)malloc(sizeof (*i));
   list_item_init(i, v);
@@ -630,15 +629,15 @@ list_reverse_iterator_is_valid(list_reverse_iterator_t *li)
 void *
 kmalloc(int size)
 {
+    void *r = (void *)freeptr;
+    freeptr += size;
 
-	//printf("size: %d, current offset: %p\n",size,freeptr);
-	void * r = (void *)freeptr;
-	freeptr+=size;
-	if(freeptr > malloc_size+(long)mem){
-		printf("Memory Overflow\n");
-		exit(1);
-	}
-	return r;
+    if (freeptr > mem + malloc_size) {
+        printf("Memory Overflow\n");
+        exit(1);
+    }
+
+    return r;
 }
 
 //transforms the current B+ Tree into a single, contiguous block of memory to be used on the GPU
@@ -657,7 +656,7 @@ transform_to_cuda(	node * root,
 		printf("Initial malloc error\n");
 		exit(1);
 	}
-	freeptr = (long)mem;
+	freeptr = mem;
 
 	krecords = (record * )kmalloc(size*sizeof(record));
 	// printf("%d records\n", size);
@@ -1958,7 +1957,7 @@ main(	int argc,
 
      pFile = fopen (output,"w+");
      if (pFile==NULL) 
-       fputs ("Fail to open %s !\n",output);
+       fprintf(stderr, "Fail to open %s!\n", output);
      fprintf(pFile,"******starting******\n");
      fclose(pFile);
 
@@ -2021,7 +2020,7 @@ main(	int argc,
 	printf("Transforming data to a GPU suitable structure...\n");
 	long mem_used = transform_to_cuda(root,0);
 	maxheight = height(root);
-	long rootLoc = (long)knodes - (long)mem;
+	long rootLoc = (long)((char *)knodes - mem);
 
 	// ------------------------------------------------------------60
 	// process commands
@@ -2148,7 +2147,7 @@ main(	int argc,
 				// get # of queries from user
 				int count;
 				sscanf(commandPointer, "%d", &count);
-				while(*commandPointer!=32 && commandPointer!='\n')
+				while(*commandPointer!=32 && *commandPointer!='\n')
 				  commandPointer++;
 
 				printf("\n ******command: k count=%d \n",count);
@@ -2164,7 +2163,7 @@ main(	int argc,
 				printf("records_elem=%d, records_unit_mem=%d, records_mem=%d\n", (int)records_elem, (int)sizeof(record), (int)records_mem);
 
 				// INPUT: knodes CPU allocation (setting pointer in mem variable)
-				knode *knodes = (knode *)((long)mem + (long)rootLoc);
+				knode *knodes = (knode *)(mem + rootLoc);
 				long knodes_elem = ((long)(mem_used) - (long)rootLoc) / sizeof(knode);
 				long knodes_mem = (long)(mem_used) - (long)rootLoc;
 				printf("knodes_elem=%d, knodes_unit_mem=%d, knodes_mem=%d\n", (int)knodes_elem, (int)sizeof(knode), (int)knodes_mem);
@@ -2224,7 +2223,7 @@ main(	int argc,
 				pFile = fopen (output,"aw+");
 				if (pFile==NULL)
 				  {
-				    fputs ("Fail to open %s !\n",output);
+				    fprintf(stderr, "Fail to open %s!\n", output);
 				  }
 				
 				fprintf(pFile,"\n ******command: k count=%d \n",count);
@@ -2278,12 +2277,12 @@ main(	int argc,
 				// get # of queries from user
 				int count;
 				sscanf(commandPointer, "%d", &count);
-				while(*commandPointer!=32 && commandPointer!='\n')
+				while(*commandPointer!=32 && *commandPointer!='\n')
 				  commandPointer++;
 
 				int rSize;
 				sscanf(commandPointer, "%d", &rSize);
-				while(*commandPointer!=32 && commandPointer!='\n')
+				while(*commandPointer!=32 && *commandPointer!='\n')
 				  commandPointer++;
 
 				printf("\n******command: j count=%d, rSize=%d \n",count, rSize);
@@ -2293,7 +2292,7 @@ main(	int argc,
 				}
 
 				// INPUT: knodes CPU allocation (setting pointer in mem variable)
-				knode *knodes = (knode *)((long)mem + (long)rootLoc);
+				knode *knodes = (knode *)(mem + rootLoc);
 				long knodes_elem = ((long)(mem_used) - (long)rootLoc) / sizeof(knode);
 				long knodes_mem = (long)(mem_used) - (long)rootLoc;
 				printf("knodes_elem=%d, knodes_unit_mem=%d, knodes_mem=%d\n", (int)knodes_elem, (int)sizeof(knode), (int)knodes_mem);
@@ -2371,7 +2370,7 @@ main(	int argc,
 				pFile = fopen (output,"aw+");
 				if (pFile==NULL)
 				  {
-				    fputs ("Fail to open %s !\n",output);
+				    fprintf(stderr, "Fail to open %s!\n", output);
 				  }
 
 				fprintf(pFile,"\n******command: j count=%d, rSize=%d \n",count, rSize);				

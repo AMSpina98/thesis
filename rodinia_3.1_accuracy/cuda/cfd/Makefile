@@ -1,81 +1,55 @@
-# NMAKE Makefile per B+Tree (Windows, CUDA Toolkit + MSVC)
-# Lanciare da "x64 Native Tools Command Prompt for VS"
-# in modo che cl.exe e nvcc siano nel PATH.
+# NMAKE Makefile per CFD (Windows, CUDA Toolkit + MSVC)
+# Lanciare da "x64 Native Tools Command Prompt for VS" cosi' cl.exe e nvcc
+# risultano entrambi nel PATH.
 
 CUD_C = nvcc
-C_C   = cl
+
+# Optional includes
+CUDA_INC = -I..\..\cuda\diversity
 
 # GTX 1650 Ti -> Turing -> sm_75
 CUDA_FLAG = -gencode arch=compute_75,code=sm_75
 
-# Include per le librerie/diversity personalizzate
-CUDA_INC = -I..\..\cuda\diversity
-
-# Ottimizzazione
-C_OPT    = /O2
-CUDA_OPT = -O3 -std=c++17
+# Optimization + profiling support
+OPT = -O3 -std=c++17 --source-in-ptx -lineinfo
 
 
-# ============================================================
-# Executable
-# ============================================================
-
-all: b+tree.exe
-
-
-b+tree.exe: main.obj kernel_gpu_cuda_wrapper.obj kernel_gpu_cuda_wrapper_2.obj compare_utils.obj timer.obj num.obj cuda.obj
-	$(CUD_C) main.obj kernel_gpu_cuda_wrapper.obj kernel_gpu_cuda_wrapper_2.obj compare_utils.obj timer.obj num.obj cuda.obj -o b+tree.exe
+all: euler3d.exe euler3d_double.exe pre_euler3d.exe pre_euler3d_double.exe
 
 
 # ============================================================
-# Main
+# Executables
 # ============================================================
 
-main.obj: main.c common.h main.h
-	$(C_C) $(C_OPT) /c main.c /Fo$@
+euler3d.exe: euler3d.obj
+	$(CUD_C) euler3d.obj -o euler3d.exe
 
+euler3d_double.exe: euler3d_double.obj
+	$(CUD_C) euler3d_double.obj -o euler3d_double.exe
 
-# ============================================================
-# CUDA kernels
-# ============================================================
+pre_euler3d.exe: pre_euler3d.obj
+	$(CUD_C) pre_euler3d.obj -o pre_euler3d.exe
 
-kernel_gpu_cuda_wrapper.obj: kernel\kernel_gpu_cuda_wrapper.cu common.h kernel\kernel_gpu_cuda_wrapper.h
-	$(CUD_C) $(CUDA_OPT) $(CUDA_FLAG) $(CUDA_INC) -c kernel\kernel_gpu_cuda_wrapper.cu -o kernel_gpu_cuda_wrapper.obj
-
-
-kernel_gpu_cuda_wrapper_2.obj: kernel\kernel_gpu_cuda_wrapper_2.cu common.h kernel\kernel_gpu_cuda_wrapper_2.h
-	$(CUD_C) $(CUDA_OPT) $(CUDA_FLAG) $(CUDA_INC) -c kernel\kernel_gpu_cuda_wrapper_2.cu -o kernel_gpu_cuda_wrapper_2.obj
-
-
-compare_utils.obj: kernel\compare_utils.cu common.h kernel\compare_utils.h
-	$(CUD_C) $(CUDA_OPT) $(CUDA_FLAG) $(CUDA_INC) -c kernel\compare_utils.cu -o compare_utils.obj
+pre_euler3d_double.exe: pre_euler3d_double.obj
+	$(CUD_C) pre_euler3d_double.obj -o pre_euler3d_double.exe
 
 
 # ============================================================
-# Utilities
+# Objects
 # ============================================================
 
-timer.obj: util\timer\timer.c common.h util\timer\timer.h
-	$(C_C) $(C_OPT) /c util\timer\timer.c /Fo$@
+euler3d.obj: euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c euler3d.cu -o euler3d.obj
 
+euler3d_double.obj: euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c euler3d_double.cu -o euler3d_double.obj
 
-num.obj: util\num\num.c common.h util\num\num.h
-	$(C_C) $(C_OPT) /c util\num\num.c /Fo$@
+pre_euler3d.obj: pre_euler3d.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c pre_euler3d.cu -o pre_euler3d.obj
 
+pre_euler3d_double.obj: pre_euler3d_double.cu
+	$(CUD_C) $(OPT) -Xptxas -v $(CUDA_FLAG) $(CUDA_INC) -c pre_euler3d_double.cu -o pre_euler3d_double.obj
 
-cuda.obj: util\cuda\cuda.cu common.h util\cuda\cuda.h
-	$(CUD_C) $(CUDA_OPT) $(CUDA_FLAG) $(CUDA_INC) -c util\cuda\cuda.cu -o cuda.obj
-
-
-# ============================================================
-# Clean
-# ============================================================
 
 clean:
-	del /Q *.obj b+tree.exe *.exp *.lib 2>NUL
-	del /Q kernel\*.obj 2>NUL
-	del /Q util\timer\*.obj 2>NUL
-	del /Q util\num\*.obj 2>NUL
-	del /Q util\cuda\*.obj 2>NUL
-	del /Q kernel\btree_results*.csv 2>NUL
-	del /Q output.txt 2>NUL
+	del /Q *.obj euler3d.exe euler3d_double.exe pre_euler3d.exe pre_euler3d_double.exe *.exp *.lib 2>NUL

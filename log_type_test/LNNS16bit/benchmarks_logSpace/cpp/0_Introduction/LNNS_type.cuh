@@ -153,7 +153,7 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 2048.0f);
+        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
         if(mantissa > 32767) mantissa = 32767;
         if(mantissa < -32768) mantissa = -32768;
         uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
@@ -170,7 +170,7 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         double y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 2048.0);
+        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0);
         if(mantissa > 32767) mantissa = 32767;
         if(mantissa < -32768) mantissa = -32768;
         uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
@@ -187,7 +187,7 @@ struct LNNS {
             return;
         }
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 2048.0);
+        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0);
         if(mantissa > 32767) mantissa = 32767;
         if(mantissa < -32768) mantissa = -32768;
         value = static_cast<uint16_t>(mantissa) & 0x7FFF;
@@ -204,7 +204,7 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 2048.0f);
+        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
         if(mantissa > 32767) mantissa = 32767;
         if(mantissa < -32768) mantissa = -32768;
         uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
@@ -224,8 +224,8 @@ struct LNNS {
         int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
         uint16_t signA = (value >> 15) & 0x1;
         uint16_t signB = (other.value >> 15) & 0x1;
-        float xa = ((float)mantissaA)/2048.0f;
-        float xb = ((float)mantissaB)/2048.0f;
+        float xa = ((float)mantissaA)/1024.0f;
+        float xb = ((float)mantissaB)/1024.0f;
         float xc;
         uint16_t signC;
         if(signA == signB){
@@ -237,7 +237,7 @@ struct LNNS {
             if(xa > xb) signC = signA;
             else signC = signB;
         }
-        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 2048.0f));
+        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 1024.0f));
         if(mantissaC > 32767) mantissaC = 32767;
         if(mantissaC < -32768) mantissaC = -32768;
         return LNNS::raw(static_cast<uint16_t>((signC << 15) | (mantissaC & 0x7fff)));
@@ -257,8 +257,8 @@ struct LNNS {
         int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
         uint16_t signA = (value >> 15) & 0x1;
         uint16_t signB = (other.value >> 15) & 0x1;
-        float xa = ((float)mantissaA)/2048.0f;
-        float xb = ((float)mantissaB)/2048.0f;
+        float xa = ((float)mantissaA)/1024.0f;
+        float xb = ((float)mantissaB)/1024.0f;
         float xc;
         uint16_t signC;
         if(signA == signB){
@@ -273,7 +273,7 @@ struct LNNS {
             if(xa > xb) signC = signA;
             else signC = signB;
         }
-        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 2048.0f));
+        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 1024.0f));
         if(mantissaC > 63) mantissaC = 32767;
         if(mantissaC < -64) mantissaC = -32768;
         value = LNNS::raw(static_cast<uint16_t>((signC << 15) | (mantissaC & 0x7fff)));
@@ -288,8 +288,8 @@ struct LNNS {
         int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
         uint16_t signA = (value >> 15) & 0x1;
         uint16_t signB = (other.value >> 15) & 0x1;
-        float xa = ((float)mantissaA)/2048.0f;
-        float xb = ((float)mantissaB)/2048.0f;
+        float xa = ((float)mantissaA)/1024.0f;
+        float xb = ((float)mantissaB)/1024.0f;
         float xc;
         uint16_t signC;
         if(signA != signB){
@@ -301,7 +301,7 @@ struct LNNS {
             if(xa > xb) signC = signA;
             else signC = signA^1;
         }
-        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 2048.0f));
+        int16_t mantissaC = (LNNSMath::NearbyInt(xc * 1024.0f));
         if(mantissaC > 32767) mantissaC = 32767;
         if(mantissaC < -32768) mantissaC = -32768;
         return LNNS::raw(static_cast<uint16_t>((signC << 15) | (mantissaC & 0x7fff)));
@@ -321,8 +321,8 @@ struct LNNS {
         int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
         uint16_t signA = (value >> 15) & 0x1;
         uint16_t signB = (other.value >> 15) & 0x1;
-        float xa = ((float)mantissaA)/2048.0f;
-        float xb = ((float)mantissaB)/2048.0f;
+        float xa = ((float)mantissaA)/1024.0f;
+        float xb = ((float)mantissaB)/1024.0f;
         float xc;
         uint16_t signC;
         if(signA != signB){

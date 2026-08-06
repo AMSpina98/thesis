@@ -16,7 +16,7 @@
  * 
  */ 
 #define GAMMA 1.4
-#define iterations 2000
+#define iterations 10
 #ifndef block_length
 	#define block_length 192
 #endif
@@ -32,11 +32,11 @@
  * not options
  */
 
-
+/*
 #if block_length > 128
 #warning "the kernels may fail too launch on some systems if the block length is too large"
 #endif
-
+*/
 
 #define VAR_DENSITY 0
 #define VAR_MOMENTUM  1
@@ -766,7 +766,7 @@ int main(int argc, char** argv)
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(float)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
@@ -820,7 +820,7 @@ int main(int argc, char** argv)
 	      }
 	  }
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	sdkStopTimer(timer);  
 
 	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;

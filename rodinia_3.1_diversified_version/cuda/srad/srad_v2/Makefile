@@ -1,24 +1,21 @@
-include ../../../common/make.config
+NVCC = nvcc
 
-CC := $(CUDA_DIR)/bin/nvcc
+# GTX 1650 Ti -> Turing -> sm_75
+CUDA_FLAGS = -gencode arch=compute_75,code=sm_75
 
-INCLUDE := $(CUDA_DIR)/include
+NVCC_FLAGS = -O3 -std=c++17 --source-in-ptx -lineinfo $(CUDA_FLAGS)
 
 SRC = srad.cu
+EXE = srad.exe
 
-EXE = srad
 
-release: $(SRC)
-	$(CC) $(KERNEL_DIM) $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
+all: $(EXE)
 
-enum: $(SRC)
-	$(CC) $(KERNEL_DIM) -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
+$(EXE): $(SRC)
+	$(NVCC) $(NVCC_FLAGS) $(SRC) -o $(EXE)
 
 debug: $(SRC)
-	$(CC) $(KERNEL_DIM) -g $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
+	$(NVCC) -g -G -std=c++17 $(CUDA_FLAGS) $(SRC) -o $(EXE)
 
-debugenum: $(SRC)
-	$(CC) $(KERNEL_DIM) -g -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
-
-clean: $(SRC)
-	rm -f $(EXE) $(EXE).linkinfo result.txt
+clean:
+	del /Q $(EXE) result.txt 2>NUL

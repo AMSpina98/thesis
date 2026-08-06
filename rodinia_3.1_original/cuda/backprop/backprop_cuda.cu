@@ -6,11 +6,12 @@
 #include <string.h>
 #include <math.h>
 #include <cuda.h>
-#include <sys/time.h>
 
 // includes, kernels
 #include "backprop_cuda_kernel.cu"
 #include "backprop.h"
+#include "win_compat.h"
+#include "cuda_compat.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -127,7 +128,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 											  in,
 											  hid);
  
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   
   cudaError_t error = cudaGetLastError();
 	if (error != cudaSuccess) {

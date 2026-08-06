@@ -1,5 +1,6 @@
 #include <stdlib.h>
-#include <sys/time.h>
+#include "../../diversity/win_compat.h"
+#include "../../diversity/cuda_compat.h"
 
  // Returns the current system time in microseconds
 long long get_time() {

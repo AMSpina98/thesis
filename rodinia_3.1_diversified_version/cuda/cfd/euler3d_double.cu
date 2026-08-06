@@ -20,7 +20,7 @@ struct double3
  * 
  */ 
 #define GAMMA 1.4
-#define iterations 2000
+#define iterations 10
 #ifndef block_length
 	#define block_length 128
 #endif
@@ -659,7 +659,7 @@ int main(int argc, char** argv)
 	initialize_variables(nelr, fluxes);
 	cudaMemset( (void*) step_factors, 0, sizeof(double)*nelr );
 	// make sure CUDA isn't still doing something before we start timing
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
@@ -739,7 +739,7 @@ int main(int argc, char** argv)
 		  }
 	}
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	sdkStopTimer(timer);  
 
 	std::cout  << (sdkGetAverageTimerValue(timer)/1000.0)  / iterations << " seconds per iteration" << std::endl;
