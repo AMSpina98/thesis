@@ -126,7 +126,7 @@ namespace LNNSMath {
 }
 
 
-struct LNNS {private:
+struct LNNS {
     uint8_t value;
 
     public:
@@ -244,9 +244,15 @@ struct LNNS {private:
         return LNNS::raw(static_cast<uint8_t>((signC << 7) | (mantissaC & 0x7F)));
     }
 
-    __host__ __device__ LNNS operator+=(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint8_t>(LOG_NAN));
-        if(value == LOG_ZERO) return other;
+    __host__ __device__ LNNS& operator+=(const LNNS& other) {
+        if(value == LOG_NAN || other.value == LOG_NAN){
+            value = LOG_NAN;
+            return *this;
+        }
+        if(value == LOG_ZERO){
+            value = other.value;
+            return *this;
+        }
         if(other.value == LOG_ZERO) return *this;
         int8_t mantissaA = ((value & 0x40)<<1) | (value & 0x7f);
         int8_t mantissaB = ((other.value & 0x40)<<1) | (other.value & 0x7f);
@@ -260,7 +266,10 @@ struct LNNS {private:
             xc = LNNSMath::Log(LNNSMath::Exp(xa) + LNNSMath::Exp(xb));
             signC = signA;
         }else{
-            if(xa == xb) return LNNS::raw(static_cast<uint8_t>(LOG_ZERO));
+            if(xa == xb){
+                value = other.value;
+                return *this;
+            }
             xc = LNNSMath::Log(LNNSMath::Abs(LNNSMath::Exp(xa) - LNNSMath::Exp(xb)));
             if(xa > xb) signC = signA;
             else signC = signB;
@@ -268,7 +277,8 @@ struct LNNS {private:
         int8_t mantissaC = (LNNSMath::NearbyInt(xc * 8.0f));
         if(mantissaC > 63) mantissaC = 63;
         if(mantissaC < -64) mantissaC = -64;
-        return LNNS::raw(static_cast<uint8_t>((signC << 7) | (mantissaC & 0x7F)));
+        value = LNNS::raw(static_cast<uint8_t>((signC << 7) | (mantissaC & 0x7F)));
+        return *this;
     }
 
     __host__ __device__ LNNS operator-(const LNNS& other) const {
@@ -298,9 +308,15 @@ struct LNNS {private:
         return LNNS::raw(static_cast<uint8_t>((signC << 7) | (mantissaC & 0x7F)));
     }
 
-    __host__ __device__ LNNS operator-=(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint8_t>(LOG_NAN));
-        if(value == LOG_ZERO) return LNNS::raw(0x80 ^ other.value);
+    __host__ __device__ LNNS& operator-=(const LNNS& other) {
+        if(value == LOG_NAN || other.value == LOG_NAN) {
+            value = LOG_NAN;
+            return *this;
+        }
+        if(value == LOG_ZERO) {
+            value = 0x80 ^ other.value;
+            return *this;
+        }
         if(other.value == LOG_ZERO) return *this;
         int8_t mantissaA = ((value & 0x40)<<1) | (value & 0x7f);
         int8_t mantissaB = ((other.value & 0x40)<<1) | (other.value & 0x7f);
@@ -314,7 +330,10 @@ struct LNNS {private:
             xc = LNNSMath::Log(LNNSMath::Exp(xa) + LNNSMath::Exp(xb));
             signC = signA;
         }else{
-            if(xa == xb) return LNNS::raw(static_cast<uint8_t>(LOG_ZERO));
+            if(xa == xb){
+                value = LOG_ZERO;
+                return *this;
+            }
             xc = LNNSMath::Log(LNNSMath::Abs(LNNSMath::Exp(xa) - LNNSMath::Exp(xb)));
             if(xa > xb) signC = signA;
             else signC = signA^1;
@@ -322,7 +341,8 @@ struct LNNS {private:
         int8_t mantissaC = (LNNSMath::NearbyInt(xc * 8.0f));
         if(mantissaC > 63) mantissaC = 63;
         if(mantissaC < -64) mantissaC = -64;
-        return LNNS::raw(static_cast<uint8_t>((signC << 7) | (mantissaC & 0x7F)));
+        value = (signC << 7) | (mantissaC & 0x7F);
+        return *this;
     }
 
     __host__ __device__ LNNS operator*(const LNNS& other) const {
@@ -338,9 +358,15 @@ struct LNNS {private:
         return LNNS::raw(static_cast<uint8_t>(((signA ^ signB)<<7) | (mantissaC & 0x7F)));
     }
 
-    __host__ __device__ LNNS operator*=(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint8_t>(LOG_NAN));
-        if(value == LOG_ZERO || other.value == LOG_ZERO) return LNNS::raw(static_cast<uint8_t>(LOG_ZERO));
+    __host__ __device__ LNNS& operator*=(const LNNS& other) {
+        if(value == LOG_NAN || other.value == LOG_NAN){
+            value = LOG_NAN;
+            return *this;
+        }
+        if(value == LOG_ZERO || other.value == LOG_ZERO){
+            value = LOG_ZERO;
+            return *this;
+        }
         int8_t mantissaA = ((value & 0x40)<<1) | (value & 0x7f);
         int8_t mantissaB = ((other.value & 0x40)<<1) | (other.value & 0x7f);
         uint8_t signA = (value >> 7) & 0x1;
@@ -348,7 +374,8 @@ struct LNNS {private:
         int8_t mantissaC = mantissaA + mantissaB;
         if(mantissaC > 63) mantissaC = 63;
         if(mantissaC < -64) mantissaC = -64;
-        return LNNS::raw(static_cast<uint8_t>(((signA ^ signB)<<7) | (mantissaC & 0x7F)));
+        value = (signA ^ signB) << 7 | (mantissaC & 0x7F);
+        return *this;
     }
 
     __host__ __device__ LNNS operator/(const LNNS& other) const {
@@ -364,9 +391,15 @@ struct LNNS {private:
         return LNNS::raw(static_cast<uint8_t>(((signA ^ signB)<<7) | (mantissaC & 0x7F)));
     }
 
-    __host__ __device__ LNNS operator/=(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN || other.value == LOG_ZERO) return LNNS::raw(static_cast<uint8_t>(LOG_NAN));
-        if(value == LOG_ZERO) return LNNS::raw(static_cast<uint8_t>(LOG_ZERO));
+    __host__ __device__ LNNS& operator/=(const LNNS& other) {
+        if(value == LOG_NAN || other.value == LOG_NAN || other.value == LOG_ZERO) {
+            value = LOG_NAN;
+            return *this;
+        }
+        if(value == LOG_ZERO) {
+            value = LOG_ZERO;
+            return *this;
+        }
         int8_t mantissaA = ((value & 0x40)<<1) | (value & 0x7f);
         int8_t mantissaB = ((other.value & 0x40)<<1) | (other.value & 0x7f);
         uint8_t signA = (value >> 7) & 0x1;
@@ -374,7 +407,8 @@ struct LNNS {private:
         int8_t mantissaC = mantissaA - mantissaB;
         if(mantissaC > 63) mantissaC = 63;
         if(mantissaC < -64) mantissaC = -64;
-        return LNNS::raw(static_cast<uint8_t>(((signA ^ signB)<<7) | (mantissaC & 0x7F)));
+        value = (signA ^ signB) << 7 | (mantissaC & 0x7F);
+        return *this;
     }
 
     __host__ __device__ bool operator<(const LNNS& other) const {

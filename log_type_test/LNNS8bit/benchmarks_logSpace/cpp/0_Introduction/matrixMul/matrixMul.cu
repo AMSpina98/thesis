@@ -254,7 +254,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
         double abs_val = fabs(h_C[i].toFloat());
         double rel_err    = abs_err / abs_val / dot_length;
 
-        if (rel_err > eps) {
+        if (rel_err > eps && correct) {
             printf("Error! Matrix[%05d]=%.12e, ref=%.12e, abs_err=%.12e, rel_err=%.12e\n",
                 i,
                 h_C[i].toDouble(),
