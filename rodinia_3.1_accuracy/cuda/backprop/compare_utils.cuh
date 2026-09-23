@@ -76,13 +76,16 @@ void write_array_to_file(const std::string& filename, const std::string& array_n
         file << "\n\n";
     }
     file << array_name << "\n";
-    file << "mismatch_count,first_error_index,max_abs_diff,max_diff_index,max_rel_diff,max_rel_diff_index\n";
+    file << "mismatch_count,first_error_index,max_abs_diff,max_diff_index,max_rel_diff,max_rel_diff_index,avg_rel_diff,rel_RMSE,abs_RMSE\n";
     file << error_data.mismatch_count << ","
          << error_data.first_error_index << ","
          << error_data.max_abs_diff << ","
          << error_data.max_diff_index << ","
          << error_data.max_rel_diff << ","
-         << error_data.max_rel_diff_index << "\n";
+         << error_data.max_rel_diff_index << ","
+         << error_data.avg_rel_diff << ","
+         << error_data.rel_RMSE << ","
+         << error_data.abs_RMSE << "\n";
 }
 
 template <typename T>

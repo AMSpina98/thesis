@@ -260,6 +260,7 @@ runTest( int argc, char** argv)
 	//Run kernels
 
 
+
 	srad_cuda_1<<<dimGrid, dimBlock>>>(E_C, W_C, N_C, S_C, J_cuda, C_cuda, cols, rows, q0sqr); 
 
 	cudaEventRecord(stopE);

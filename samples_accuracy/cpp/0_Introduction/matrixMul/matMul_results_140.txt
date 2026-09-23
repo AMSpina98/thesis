@@ -1,0 +1,8 @@
+matMulAvgKernelTime time results
+time,o_time
+0.0227504,0.0550264
+
+
+matMulResult
+mismatch_count,first_error_index,max_abs_diff,max_diff_index,max_rel_diff,max_rel_diff_index,frobenius_error,frobenius,o_frobenius
+204800,0,2.14577e-05,0,6.70548e-06,0,0.00971063,1448.16,1448.15

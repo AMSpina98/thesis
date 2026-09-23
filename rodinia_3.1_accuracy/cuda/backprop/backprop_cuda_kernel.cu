@@ -54,7 +54,8 @@ bpnn_layerforward_CUDA(float *input_cuda,
 
 	   if( ty % power_two == 0 )
 	   //weight_matrix[ty][tx] = weight_matrix[ty][tx] + weight_matrix[ty + power_two/2][tx];
-	   weight_matrix[ty][tx] = dAdd(weight_matrix[ty][tx], weight_matrix[dAdd(ty, dDiv(power_two, 2))][tx]);
+	   //weight_matrix[ty][tx] = dAdd(weight_matrix[ty][tx], weight_matrix[dAdd(ty, dDiv(power_two, 2))][tx]);
+      weight_matrix[ty][tx] = dAdd(weight_matrix[ty][tx], weight_matrix[ty + power_two/2][tx]);
 
 	   __syncthreads();
 

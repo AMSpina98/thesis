@@ -23,7 +23,7 @@ CUD_C = nvcc
 CUDA_INC = -I..\..\cuda\diversity
 
 # GTX 1650 Ti -> Turing -> compute capability 7.5
-CUDA_FLAG = -gencode arch=compute_75,code=sm_75
+CUDA_FLAG = -gencode arch=compute_75,code=sm_75 -D_M_X64=100 -D_M_AMD64=100 -D_WIN64
 
 
 # ============================================================

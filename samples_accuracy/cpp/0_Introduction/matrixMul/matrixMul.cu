@@ -249,8 +249,6 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     float elapsed, o_elapsed;
     float tot_elapsed = 0;
     float tot_o_elapsed = 0;
-    float *d_C_host = (float *)malloc(mem_size_C);
-    float *o_d_C_host = (float *)malloc(mem_size_C);
     std::string file_output;
     float avg_elapsed, avg_o_elapsed;
 
@@ -269,6 +267,8 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_B), mem_size_B));
     checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_C), mem_size_C));
     checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&o_d_C), mem_size_C));
+    float *d_C_host = (float *)malloc(mem_size_C);
+    float *o_d_C_host = (float *)malloc(mem_size_C);
     // Allocate CUDA events that we'll use for timing
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start));

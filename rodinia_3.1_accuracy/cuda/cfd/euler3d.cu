@@ -625,7 +625,7 @@ __global__ void original_cuda_compute_step_factor(int nelr, float* variables, fl
 void original_compute_step_factor(int nelr, float* variables, float* areas, float* step_factors)
 {
 	dim3 Dg(nelr / BLOCK_SIZE_2), Db(BLOCK_SIZE_2);
-	cuda_compute_step_factor<<<Dg, Db>>>(nelr, variables, areas, step_factors);		
+	original_cuda_compute_step_factor<<<Dg, Db>>>(nelr, variables, areas, step_factors);		
 	getLastCudaError("compute_step_factor failed");
 }
 

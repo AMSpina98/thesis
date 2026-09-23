@@ -1,9 +1,24 @@
 #pragma once
 
-#if defined(_WIN32) && !defined(__CUDACC__)
+#if defined(_WIN32) /* && !defined(__CUDACC__) */ //needed for b+tree
 
-#include <windows.h>
 #include <stdint.h>
+
+typedef struct _FILETIME {
+    unsigned long dwLowDateTime;
+    unsigned long dwHighDateTime;
+} FILETIME;
+
+#ifdef __cplusplus
+extern "C" __declspec(dllimport) void __stdcall GetSystemTimeAsFileTime(FILETIME* lpSystemTimeAsFileTime);
+#else
+__declspec(dllimport) void __stdcall GetSystemTimeAsFileTime(FILETIME* lpSystemTimeAsFileTime);
+#endif
+
+struct timeval {
+    long tv_sec;
+    long tv_usec;
+};
 
 struct timezone_win {
     int tz_minuteswest;

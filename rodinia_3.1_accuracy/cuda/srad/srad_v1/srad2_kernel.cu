@@ -21,8 +21,8 @@ __global__ void srad2(	fp d_lambda,
 	// indexes
     int bx = blockIdx.x;													// get current horizontal block index
 	int tx = threadIdx.x;													// get current horizontal thread index
-	//int ei = bx*NUMBER_THREADS+tx;											// more threads than actual elements !!!
-	int ei = dAdd(dMul(bx, NUMBER_THREADS), tx);											// more threads than actual elements !!!
+	int ei = bx*NUMBER_THREADS+tx;											// more threads than actual elements !!!
+	//int ei = dAdd(dMul(bx, NUMBER_THREADS), tx);											// more threads than actual elements !!!
 	int row;																// column, x position
 	int col;																// row, y position
 
@@ -31,27 +31,27 @@ __global__ void srad2(	fp d_lambda,
 	fp d_D;
 
 	// figure out row/col location in new matrix
-	//row = (ei+1) % d_Nr - 1;												// (0-n) row
-	row = dSub((dAdd(ei, 1) % d_Nr), 1);												// (0-n) row
-	//col = (ei+1) / d_Nr + 1 - 1;											// (0-n) column
-	col = dSub((dAdd((dAdd(ei, 1) / d_Nr), 1)), 1);											// (0-n) column
-	//if((ei+1) % d_Nr == 0){
-	if(dAdd(ei, 1) % d_Nr == 0){
-		//row = d_Nr - 1;
-		row = dSub(d_Nr, 1);
-		//col = col - 1;
-		col = dSub(col, 1);
+	row = (ei+1) % d_Nr - 1;												// (0-n) row
+	//row = dSub((dAdd(ei, 1) % d_Nr), 1);												// (0-n) row
+	col = (ei+1) / d_Nr + 1 - 1;											// (0-n) column
+	//col = dSub((dAdd((dAdd(ei, 1) / d_Nr), 1)), 1);											// (0-n) column
+	if((ei+1) % d_Nr == 0){
+	//if(dAdd(ei, 1) % d_Nr == 0){
+		row = d_Nr - 1;
+		//row = dSub(d_Nr, 1);
+		col = col - 1;
+		//col = dSub(col, 1);
 	}
 
 	if(ei<d_Ne){															// make sure that only threads matching jobs run
 
 		// diffusion coefficent
 		d_cN = d_c[ei];														// north diffusion coefficient
-		//d_cS = d_c[d_iS[row] + d_Nr*col];										// south diffusion coefficient
-		d_cS = d_c[dAdd(d_iS[row], dMul(d_Nr, col))];										// south diffusion coefficient
+		d_cS = d_c[d_iS[row] + d_Nr*col];										// south diffusion coefficient
+		//d_cS = d_c[dAdd(d_iS[row], dMul(d_Nr, col))];										// south diffusion coefficient
 		d_cW = d_c[ei];														// west diffusion coefficient
-		//d_cE = d_c[row + d_Nr * d_jE[col]];									// east diffusion coefficient
-		d_cE = d_c[dAdd(row, dMul(d_Nr, d_jE[col]))];									// east diffusion coefficient
+		d_cE = d_c[row + d_Nr * d_jE[col]];									// east diffusion coefficient
+		//d_cE = d_c[dAdd(row, dMul(d_Nr, d_jE[col]))];									// east diffusion coefficient
 
 		// divergence (equ 58)
 		//d_D = d_cN*d_dN[ei] + d_cS*d_dS[ei] + d_cW*d_dW[ei] + d_cE*d_dE[ei];// divergence

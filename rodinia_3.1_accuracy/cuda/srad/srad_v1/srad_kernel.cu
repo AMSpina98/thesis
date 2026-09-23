@@ -22,8 +22,8 @@ __global__ void srad(	fp d_lambda,
 	// indexes
     int bx = blockIdx.x;													// get current horizontal block index
 	int tx = threadIdx.x;													// get current horizontal thread index
-	//int ei = bx*NUMBER_THREADS+tx;											// more threads than actual elements !!!
-	int ei = dAdd(dMul(bx, NUMBER_THREADS), tx);											// more threads than actual elements !!!
+	int ei = bx*NUMBER_THREADS+tx;											// more threads than actual elements !!!
+	//int ei = dAdd(dMul(bx, NUMBER_THREADS), tx);											// more threads than actual elements !!!
 	int row;																// column, x position
 	int col;																// row, y position
 
@@ -34,16 +34,16 @@ __global__ void srad(	fp d_lambda,
 	fp d_G2,d_L,d_num,d_den,d_qsqr;
 	
 	// figure out row/col location in new matrix
-	//row = (ei+1) % d_Nr - 1;													// (0-n) row
-	row = dSub(dAdd(ei, 1) % d_Nr, 1);													// (0-n) row
-	//col = (ei+1) / d_Nr + 1 - 1;												// to verify
-	col = dSub(dAdd(dDiv(dAdd(ei, 1), d_Nr), 1), 1);												// (0-n) column
-	//if((ei+1) % d_Nr == 0){
-	if(dAdd(ei, 1) % d_Nr == 0){
-		//row = d_Nr - 1;
-		row = dSub(d_Nr, 1);
-		//col = col - 1;
-		col = dSub(col, 1);
+	row = (ei+1) % d_Nr - 1;													// (0-n) row
+	//row = dSub(dAdd(ei, 1) % d_Nr, 1);													// (0-n) row
+	col = (ei+1) / d_Nr + 1 - 1;												// to verify
+	//col = dSub(dAdd(dDiv(dAdd(ei, 1), d_Nr), 1), 1);												// (0-n) column
+	if((ei+1) % d_Nr == 0){
+	//if(dAdd(ei, 1) % d_Nr == 0){
+		row = d_Nr - 1;
+		//row = dSub(d_Nr, 1);
+		col = col - 1;
+		//col = dSub(col, 1);
 	}
 	
 	if(ei<d_Ne){															// make sure that only threads matching jobs run
@@ -53,13 +53,17 @@ __global__ void srad(	fp d_lambda,
 		
 		// directional derivates (every element of IMAGE)(try to copy to shared memory or temp files)
 		//d_dN_loc = d_I[d_iN[row] + d_Nr*col] - d_Jc;						// north direction derivative
-		d_dN_loc = dSub(d_I[dAdd(d_iN[row], dMul(d_Nr, col))], d_Jc);						// north direction derivative
+		//d_dN_loc = dSub(d_I[dAdd(d_iN[row], dMul(d_Nr, col))], d_Jc);						// north direction derivative
+		d_dN_loc = dSub(d_I[d_iN[row] + d_Nr*col], d_Jc);						// north direction derivative
 		//d_dS_loc = d_I[d_iS[row] + d_Nr*col] - d_Jc;						// south direction derivative
-		d_dS_loc = dSub(d_I[dAdd(d_iS[row], dMul(d_Nr, col))], d_Jc);						// south direction derivative
+		//d_dS_loc = dSub(d_I[dAdd(d_iS[row], dMul(d_Nr, col))], d_Jc);						// south direction derivative
+		d_dS_loc = dSub(d_I[d_iS[row] + d_Nr*col], d_Jc);						// south direction derivative
 		//d_dW_loc = d_I[row + d_Nr*d_jW[col]] - d_Jc;						// west direction derivative
-		d_dW_loc = dSub(d_I[dAdd(row, dMul(d_Nr, d_jW[col]))], d_Jc);						// west direction derivative
+		//d_dW_loc = dSub(d_I[dAdd(row, dMul(d_Nr, d_jW[col]))], d_Jc);						// west direction derivative
+		d_dW_loc = dSub(d_I[row + d_Nr*d_jW[col]], d_Jc);						// west direction derivative
 		//d_dE_loc = d_I[row + d_Nr*d_jE[col]] - d_Jc;						// east direction derivative
-		d_dE_loc = dSub(d_I[dAdd(row, dMul(d_Nr, d_jE[col]))], d_Jc);						// east direction derivative
+		//d_dE_loc = dSub(d_I[dAdd(row, dMul(d_Nr, d_jE[col]))], d_Jc);						// east direction derivative
+		d_dE_loc = dSub(d_I[row + d_Nr*d_jE[col]], d_Jc);						// east direction derivative
 	 
 		// normalized discrete gradient mag squared (equ 52,53)
 		//d_G2 = (d_dN_loc*d_dN_loc + d_dS_loc*d_dS_loc + d_dW_loc*d_dW_loc + d_dE_loc*d_dE_loc) / (d_Jc*d_Jc);	// gradient (based on derivatives)

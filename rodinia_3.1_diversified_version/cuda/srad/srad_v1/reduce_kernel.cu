@@ -45,9 +45,11 @@ __global__ void reduce(	long d_Ne,											// number of elements in array
 			// sum of elements
 			if(dAdd(tx, 1) % i == 0){						// every ith
 				//d_psum[tx] = d_psum[tx] + d_psum[tx-i/2];				// every ith
-				d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+				//d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+				d_psum[tx] = dAdd(d_psum[tx], d_psum[tx-i/2]);
 				//d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];						
-				d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);
+				//d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);	
+				d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[tx-i/2]);
 			}
 			// synchronization
 			__syncthreads();
@@ -73,9 +75,11 @@ __global__ void reduce(	long d_Ne,											// number of elements in array
 				//if((tx+1) % i == 0){										// every ith
 				if(dAdd(tx, 1) % i == 0){
 					//d_psum[tx] = d_psum[tx] + d_psum[tx-i/2];				// every ith
-					d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+					//d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+					d_psum[tx] = dAdd(d_psum[tx], d_psum[tx-i/2]);
 					//d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];						
-					d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);
+					//d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);	
+					d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[tx-i/2]);
 				}
 				// synchronization
 				__syncthreads();											//
@@ -105,9 +109,11 @@ __global__ void reduce(	long d_Ne,											// number of elements in array
 				//if((tx+1) % i == 0 && tx<df){								// every ith
 				if(dAdd(tx, 1) % i == 0 && tx<df){		
 					//d_psum[tx] = d_psum[tx] + d_psum[tx-i/2];// every ith
-					d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+					//d_psum[tx] = dAdd(d_psum[tx], d_psum[dSub(tx, dDiv(i, 2))]);
+					d_psum[tx] = dAdd(d_psum[tx], d_psum[tx-i/2]);
 					//d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];						
-					d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);
+					//d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[dSub(tx, dDiv(i, 2))]);	
+					d_psum2[tx] = dAdd(d_psum2[tx], d_psum2[tx-i/2]);
 				}
 				// synchronization (all threads)
 				__syncthreads();											//

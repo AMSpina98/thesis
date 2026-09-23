@@ -2212,12 +2212,12 @@ main(	int argc,
 										keys,
 										ans);
 
-				/* printf("ans: \n"); */
-				/* for(i = 0; i < count; i++){ */
-				/*   printf("%d    ",ans[i].value); */
-				/* } */
+				 printf("ans: \n"); 
+				 for(i = 0; i < count; i++){ 
+				   printf("%d    ",ans[i].value); 
+				 } 
 				
-				/* printf(" \n"); */
+				 printf(" \n"); 
 
 
 				pFile = fopen (output,"aw+");

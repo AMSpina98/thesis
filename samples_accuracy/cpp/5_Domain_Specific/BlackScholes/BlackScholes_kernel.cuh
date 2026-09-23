@@ -107,7 +107,8 @@ __launch_bounds__(128) __global__ void BlackScholesGPU(float2 *__restrict d_Call
     // Calculating 2 options per thread to increase ILP (instruction level
     // parallelism)
     //if (opt < (optN / 2)) {
-    if (opt < dDiv(optN, 2)) {
+    //if (opt < dDiv(optN, 2)) {
+    if (opt < (optN / 2)) {
         float callResult1, callResult2;
         float putResult1, putResult2;
         BlackScholesBodyGPU(callResult1,
