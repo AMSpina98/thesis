@@ -77,13 +77,13 @@ __global__ void srad(	fp d_lambda,
 		//d_num  = (0.5*d_G2) - ((1.0/16.0)*(d_L*d_L)) ;						// num (based on gradient and laplacian)
 		d_num  = dSub(dMul(0.5, d_G2), dMul(dDiv(1.0, 16.0), dMul(d_L, d_L)));						// num (based on gradient and laplacian)
 		//d_den  = 1 + (0.25*d_L);												// den (based on laplacian)
-		d_den  = dAdd(1, dMul(0.25, d_L));												// den (based on laplacian)
+		d_den  = dAdd(1.0, dMul(0.25, d_L));												// den (based on laplacian)
 		//d_qsqr = d_num/(d_den*d_den);										// qsqr (based on num and den)
 		d_qsqr = dDiv(d_num, dMul(d_den, d_den));										// qsqr (based on num and den)
 	 
 		// diffusion coefficent (equ 33) (every element of IMAGE)
 		//d_den = (d_qsqr-d_q0sqr) / (d_q0sqr * (1+d_q0sqr)) ;				// den (based on qsqr and q0sqr)
-		d_den = dDiv(dSub(d_qsqr, d_q0sqr), dMul(d_q0sqr, dAdd(1, d_q0sqr)));				// den (based on qsqr and q0sqr)
+		d_den = dDiv(dSub(d_qsqr, d_q0sqr), dMul(d_q0sqr, dAdd(1.0, d_q0sqr)));				// den (based on qsqr and q0sqr)
 		//d_c_loc = 1.0 / (1.0+d_den) ;										// diffusion coefficient (based on den)
 		d_c_loc = dDiv(1.0, dAdd(1.0, d_den));										// diffusion coefficient (based on den)
 	    

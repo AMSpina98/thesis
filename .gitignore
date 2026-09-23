@@ -4,6 +4,7 @@
 *.cubin
 *.ptx
 *.exe
+*.txt
 
 # Results
 *.csv

@@ -12,10 +12,9 @@ extern "C++" {
 
 template <typename T, typename V>
 __device__ T dMul(T A, V B) {
-    return A * B;
+    //return A * B;
     float a = Converter<T>::to(A);
     float b = Converter<V>::to(B);
-    return Converter<T>::from(a * b);
     bool sign = (a < 0.0f) ^ (b < 0.0f);
     float ma, mb;
     int ea, eb;
@@ -30,12 +29,9 @@ __device__ T dMul(T A, V B) {
 
 template <typename T, typename V>
 __device__ T dDiv(T A, V B) {
-    return A / B;
+    //return A / B;
     float a = Converter<T>::to(A);
     float b = Converter<V>::to(B);
-
-    return Converter<T>::from(a / b);
-
     bool sign = (a < 0.0f) ^ (b < 0.0f);
     float ma, mb;
     int ea, eb;
@@ -49,11 +45,9 @@ __device__ T dDiv(T A, V B) {
 
 template <typename T, typename V>
 __device__ T dAdd(T A, V B) {
-    return A + B;
+    //return A + B;
     float a = Converter<T>::to(A);
     float b = Converter<V>::to(B);
-    return Converter<T>::from(a + b);
-
     float c = max(fabs(a), fabs(b));
     if(c < 1.0f) c = 1.0f;
     a = dDiv(a,c);
@@ -65,11 +59,9 @@ __device__ T dAdd(T A, V B) {
 
 template <typename T, typename V>
 __device__ T dSub(T A, V B) {
-    return A - B;
+    //return A - B;
     float a = Converter<T>::to(A);
     float b = Converter<V>::to(B);
-    return Converter<T>::from(a - b);
-
     float c = max(fabs(a), fabs(b));
     if(c < 1.0f) c = 1.0f;
     a = dDiv(a,c);
