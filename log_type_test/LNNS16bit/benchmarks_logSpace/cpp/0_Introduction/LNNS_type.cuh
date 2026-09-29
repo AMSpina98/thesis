@@ -13,17 +13,7 @@
 #else
 #define HAS_FP8 0
 #endif
-
-struct LNNS;
-
-namespace LNNSFormat {
-
-    constexpr int SIGN_BITS = 1;
-    constexpr int MANTISSA_LENGTH = 15;
-    constexpr uint32_t MAX_MANTISSA = (1u << MANTISSA_LENGTH) - 1;
-    #define LOG_ZERO 0x4000
-    #define LOG_NAN  0xc000
-}
+ 
 
 namespace LNNSMath {
 
@@ -123,15 +113,48 @@ namespace LNNSMath {
     #endif
     }
 
+    template <typename T>
+    __host__ __device__ inline void swap(T& a, T& b) {
+    #ifdef __CUDA_ARCH__
+        T temp = a;
+        a = b;
+        b = temp;
+    #else
+        std::swap(a, b);
+    #endif
+    }
+
 }
 
+template <typename T_, int PRECISION_>
+struct LNNS { 
+    using StorageType = T_; // x-bit storage uint type for LNNS representation
+    using SignedStorageType = std::make_signed_t<StorageType>;
+    static constexpr StorageType SIGN_BITS = 1; //ALWAYS 1
+    static constexpr StorageType FRACTIONAL_BITS = PRECISION_; //Precision bits
+    static constexpr StorageType INT_BITS = sizeof(StorageType) * 8 - SIGN_BITS - FRACTIONAL_BITS; //Range bits
+    static constexpr StorageType MANTISSA_BITS = FRACTIONAL_BITS + INT_BITS;
+    static constexpr StorageType MANTISSA_SIGN_BIT = MANTISSA_BITS - 1;
+    static constexpr StorageType MANTISSA_SIGN_MASK = StorageType(1) << MANTISSA_SIGN_BIT;
+    static constexpr float SCALE_FACTOR = static_cast<float>(StorageType(1) << FRACTIONAL_BITS);
+    static constexpr StorageType SIGN_MASK = StorageType(1) << MANTISSA_BITS;
+    static constexpr SignedStorageType  MAX_MANTISSA = (1 << (MANTISSA_BITS - 1)) - 1;
+    static constexpr SignedStorageType  MIN_MANTISSA = -(1 << (MANTISSA_BITS - 1));
+    static constexpr StorageType MANTISSA_MASK = static_cast<StorageType>((StorageType(1) << MANTISSA_BITS) - 1);
+    // Define reserved values
+    static constexpr StorageType LOG_ZERO = MANTISSA_SIGN_MASK;
+    static constexpr StorageType LOG_NAN = SIGN_MASK | MANTISSA_SIGN_MASK;
 
-struct LNNS {
-    uint16_t value;
+    static constexpr StorageType STORAGE_BITS = sizeof(StorageType) * 8;
+
+    static_assert(FRACTIONAL_BITS >= 1 && FRACTIONAL_BITS < STORAGE_BITS - SIGN_BITS, "PRECISION_ must leave room for at least 1 integer/range bit");
+
+
+    StorageType value;
 
     public:
     __host__ __device__
-    static LNNS raw(uint16_t v) {
+    static LNNS raw(StorageType v) {
         return LNNS(v, RawTag{});
     }
 
@@ -139,7 +162,7 @@ struct LNNS {
     struct RawTag {};
 
     __host__ __device__
-    LNNS(uint16_t v, RawTag) : value(v) {}
+    LNNS(StorageType v, RawTag) : value(v) {}
     
     public:
     __host__ __device__ LNNS(float x){   
@@ -153,11 +176,11 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
-        if(mantissa > 32767) mantissa = 32767;
-        if(mantissa < -32768) mantissa = -32768;
-        uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
-        value = (sign << 15) | z;
+        SignedStorageType mantissa = LNNSMath::NearbyInt(y * SCALE_FACTOR);
+        if(mantissa > MAX_MANTISSA) mantissa = MAX_MANTISSA;
+        if(mantissa < MIN_MANTISSA) mantissa = MIN_MANTISSA;
+        StorageType z = static_cast<StorageType>(mantissa) & MANTISSA_MASK;
+        value = (sign << MANTISSA_BITS) | z;
     }
     __host__ __device__ LNNS(double x){  
         if(x == 0.0){
@@ -170,11 +193,11 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         double y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
-        if(mantissa > 32767) mantissa = 32767;
-        if(mantissa < -32768) mantissa = -32768;
-        uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
-        value = (sign << 15) | z;
+        SignedStorageType mantissa = LNNSMath::NearbyInt(y * SCALE_FACTOR);
+        if(mantissa > MAX_MANTISSA) mantissa = MAX_MANTISSA;
+        if(mantissa < MIN_MANTISSA) mantissa = MIN_MANTISSA;
+        StorageType z = static_cast<StorageType>(mantissa) & MANTISSA_MASK;
+        value = (sign << MANTISSA_BITS) | z;
     }
 
     __host__ __device__ LNNS(unsigned int x){
@@ -182,15 +205,11 @@ struct LNNS {
             value = LOG_ZERO;
             return;
         }
-        if(LNNSMath::IsNaNDouble(x)){
-            value = LOG_NAN;
-            return;
-        }
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
-        if(mantissa > 32767) mantissa = 32767;
-        if(mantissa < -32768) mantissa = -32768;
-        value = static_cast<uint16_t>(mantissa) & 0x7FFF;
+        SignedStorageType mantissa = LNNSMath::NearbyInt(y * SCALE_FACTOR);
+        if(mantissa > MAX_MANTISSA) mantissa = MAX_MANTISSA;
+        if(mantissa < MIN_MANTISSA) mantissa = MIN_MANTISSA;
+        value = static_cast<StorageType>(mantissa) & MANTISSA_MASK;
     }
 
     __host__ __device__ LNNS(int x){
@@ -204,44 +223,40 @@ struct LNNS {
         }
         uint8_t sign = (x < 0.0) ? 1 : 0;
         float y = LNNSMath::Log(LNNSMath::Abs(x));
-        int16_t mantissa = LNNSMath::NearbyInt(y * 1024.0f);
-        if(mantissa > 32767) mantissa = 32767;
-        if(mantissa < -32768) mantissa = -32768;
-        uint16_t z = static_cast<uint16_t>(mantissa) & 0x7FFF;
-        value = (sign << 15) | z;
+        SignedStorageType mantissa = LNNSMath::NearbyInt(y * SCALE_FACTOR);
+        if(mantissa > MAX_MANTISSA) mantissa = MAX_MANTISSA;
+        if(mantissa < MIN_MANTISSA) mantissa = MIN_MANTISSA;
+        StorageType z = static_cast<StorageType>(mantissa) & MANTISSA_MASK;
+        value = (sign << MANTISSA_BITS) | z;
     }
 
 
     LNNS() = default;
-    __host__ __device__ operator uint16_t() const { return value; }
+    __host__ __device__ explicit operator StorageType() const { return value; }
     
 
     __host__ __device__ LNNS operator+(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint16_t>(LOG_NAN));
+        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<StorageType>(LOG_NAN));
         if(value == LOG_ZERO) return other;
         if(other.value == LOG_ZERO) return *this;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        float ya = ((float)mantissaA)/1024.0f;
-        float yb = ((float)mantissaB)/1024.0f;
-        if(ya < yb){
-            std::swap(ya, yb);
-            std::swap(signA, signB);
-        }
-        float yc;
-        if(signA == signB){
-            //xc = LNNSMath::Log(LNNSMath::Exp(xa) + LNNSMath::Exp(xb));
-            yc = ya + LNNSMath::Log(1.0f + LNNSMath::Exp(yb - ya));
-        }else{
-            if(ya == yb) return LNNS::raw(static_cast<uint16_t>(LOG_ZERO));
-            yc = ya + LNNSMath::Log(1.0f - LNNSMath::Exp(yb - ya));
-        }
-        int16_t mantissaC = (LNNSMath::NearbyInt(yc * 1024.0f));
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        return LNNS::raw(static_cast<uint16_t>((signA << 15) | (mantissaC & 0x7fff)));
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        float s = (signA == signB) ? 1.0f : -1.0f; 
+        if(mantissaA == mantissaB && s == -1.0f) return LNNS::raw(static_cast<StorageType>(LOG_ZERO));
+        bool swapped = (mantissaB > mantissaA);
+        SignedStorageType mMax = swapped ? mantissaB : mantissaA;
+        SignedStorageType mMin = swapped ? mantissaA : mantissaB;
+        StorageType signA_new  = swapped ? signB : signA;
+        StorageType signB_new  = swapped ? signA : signB;
+        float ya = ((float)mMax) / SCALE_FACTOR;
+        float yb = ((float)mMin) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        return LNNS::raw(static_cast<StorageType>(signA_new | (mantissaC & MANTISSA_MASK)));
     }
 
     __host__ __device__ LNNS& operator+=(const LNNS& other) {
@@ -254,59 +269,52 @@ struct LNNS {
             return *this;
         }
         if(other.value == LOG_ZERO) return *this;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        float ya = ((float)mantissaA)/1024.0f;
-        float yb = ((float)mantissaB)/1024.0f;
-        if(ya < yb){
-            std::swap(ya, yb);
-            std::swap(signA, signB);
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        float s = (signA == signB) ? 1.0f : -1.0f; 
+        if(mantissaA == mantissaB && s == -1.0f){
+            value = LOG_ZERO;
+            return *this;
         }
-        float yc;
-        if(signA == signB){
-            //xc = LNNSMath::Log(LNNSMath::Exp(xa) + LNNSMath::Exp(xb));
-            yc = ya + LNNSMath::Log(1.0f + LNNSMath::Exp(yb - ya));
-        }else{
-            if(ya == yb){
-                value = LOG_ZERO;
-                return *this;
-            }
-            yc = ya + LNNSMath::Log(1.0f - LNNSMath::Exp(yb - ya));
-        }
-        int16_t mantissaC = (LNNSMath::NearbyInt(yc * 1024.0f));
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        value = (signA << 15) | (mantissaC & 0x7fff);
+        bool swapped = (mantissaB > mantissaA);
+        SignedStorageType mMax = swapped ? mantissaB : mantissaA;
+        SignedStorageType mMin = swapped ? mantissaA : mantissaB;
+        StorageType signA_new  = swapped ? signB : signA;
+        StorageType signB_new  = swapped ? signA : signB;
+        float ya = ((float)mMax) / SCALE_FACTOR;
+        float yb = ((float)mMin) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));;
+        SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        value = signA_new | (mantissaC & MANTISSA_MASK);
         return *this;
     }
 
     __host__ __device__ LNNS operator-(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint16_t>(LOG_NAN));
-        if(value == LOG_ZERO) return LNNS::raw(0x8000 ^ other.value);
+        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<StorageType>(LOG_NAN));
+        if(value == LOG_ZERO) return LNNS::raw(SIGN_MASK ^ other.value);
         if(other.value == LOG_ZERO) return *this;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        float ya = ((float)mantissaA)/1024.0f;
-        float yb = ((float)mantissaB)/1024.0f;
-        if(ya < yb){
-            std::swap(ya, yb);
-            std::swap(signA, signB);
-        }
-        float yc;
-        if(signA != signB){
-            yc = ya + LNNSMath::Log(1.0f + LNNSMath::Exp(yb - ya));
-        }else{
-            if(ya == yb) return LNNS::raw(static_cast<uint16_t>(LOG_ZERO));
-            yc = ya + LNNSMath::Log(1.0f - LNNSMath::Exp(yb - ya));
-        }
-        int16_t mantissaC = (LNNSMath::NearbyInt(yc * 1024.0f));
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        return LNNS::raw(static_cast<uint16_t>((signA << 15) | (mantissaC & 0x7fff)));
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = (other.value & SIGN_MASK) ^ SIGN_MASK;
+        float s = (signA == signB) ? 1.0f : -1.0f;
+        if(mantissaA == mantissaB && s == -1.0f) return LNNS::raw(static_cast<StorageType>(LOG_ZERO));
+        bool swapped = (mantissaB > mantissaA);
+        SignedStorageType mMax = swapped ? mantissaB : mantissaA;
+        SignedStorageType mMin = swapped ? mantissaA : mantissaB;
+        StorageType signA_new  = swapped ? signB : signA;
+        StorageType signB_new  = swapped ? signA : signB;
+        float ya = ((float)mMax) / SCALE_FACTOR;
+        float yb = ((float)mMin) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        return LNNS::raw(static_cast<StorageType>(signA_new | (mantissaC & MANTISSA_MASK)));
     }
 
     __host__ __device__ LNNS& operator-=(const LNNS& other) {
@@ -315,48 +323,45 @@ struct LNNS {
             return *this;
         }
         if(value == LOG_ZERO) {
-            value = 0x8000 ^ other.value;
+            value = SIGN_MASK ^ other.value;
             return *this;
         }
         if(other.value == LOG_ZERO) return *this;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        float ya = ((float)mantissaA)/1024.0f;
-        float yb = ((float)mantissaB)/1024.0f;
-        if(ya < yb){
-            std::swap(ya, yb);
-            std::swap(signA, signB);
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = (other.value & SIGN_MASK) ^ SIGN_MASK;
+        float s = (signA == signB) ? 1.0f : -1.0f;
+        if(mantissaA == mantissaB && s == -1.0f){
+            value = LOG_ZERO;
+            return *this;
         }
-        float yc;
-        if(signA != signB){
-            yc = ya + LNNSMath::Log(1.0f + LNNSMath::Exp(yb - ya));
-        }else{
-            if(ya == yb){
-                value = LOG_ZERO;
-                return *this;
-            }
-            yc = ya + LNNSMath::Log(1.0f - LNNSMath::Exp(yb - ya));
-        }
-        int16_t mantissaC = (LNNSMath::NearbyInt(yc * 1024.0f));
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        value = (signA << 15) | (mantissaC & 0x7fff);
+        bool swapped = (mantissaB > mantissaA);
+        SignedStorageType mMax = swapped ? mantissaB : mantissaA;
+        SignedStorageType mMin = swapped ? mantissaA : mantissaB;
+        StorageType signA_new  = swapped ? signB : signA;
+        StorageType signB_new  = swapped ? signA : signB;
+        float ya = ((float)mMax) / SCALE_FACTOR;
+        float yb = ((float)mMin) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        value = signA_new | (mantissaC & MANTISSA_MASK);
         return *this;
     }
 
     __host__ __device__ LNNS operator*(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<uint16_t>(LOG_NAN));
-        if(value == LOG_ZERO || other.value == LOG_ZERO) return LNNS::raw(static_cast<uint16_t>(LOG_ZERO));
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        int16_t mantissaC = mantissaA + mantissaB;
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        return LNNS::raw(static_cast<uint16_t>(((signA ^ signB)<<15) | (mantissaC & 0x7fff)));
+        if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<StorageType>(LOG_NAN));
+        if(value == LOG_ZERO || other.value == LOG_ZERO) return LNNS::raw(static_cast<StorageType>(LOG_ZERO));
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        SignedStorageType mantissaC = mantissaA + mantissaB;
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        return LNNS::raw(static_cast<StorageType>((signA ^ signB) | (mantissaC & MANTISSA_MASK)));
     }
 
     __host__ __device__ LNNS& operator*=(const LNNS& other) {
@@ -368,28 +373,28 @@ struct LNNS {
             value = LOG_ZERO;
             return *this;
         }
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        int16_t mantissaC = mantissaA + mantissaB;
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        value = (signA ^ signB) << 15 | (mantissaC & 0x7fff);
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        SignedStorageType mantissaC = mantissaA + mantissaB;
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        value = (signA ^ signB) | (mantissaC & MANTISSA_MASK);
         return *this;
     }
 
     __host__ __device__ LNNS operator/(const LNNS& other) const {
-        if(value == LOG_NAN || other.value == LOG_NAN || other.value == LOG_ZERO) return LNNS::raw(static_cast<uint16_t>(LOG_NAN));
-        if(value == LOG_ZERO) return LNNS::raw(static_cast<uint16_t>(LOG_ZERO));
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        int16_t mantissaC = mantissaA - mantissaB;
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        return LNNS::raw(static_cast<uint16_t>(((signA ^ signB)<<15) | (mantissaC & 0x7fff)));
+        if(value == LOG_NAN || other.value == LOG_NAN || other.value == LOG_ZERO) return LNNS::raw(static_cast<StorageType>(LOG_NAN));
+        if(value == LOG_ZERO) return LNNS::raw(static_cast<StorageType>(LOG_ZERO));
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        SignedStorageType mantissaC = mantissaA - mantissaB;
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        return LNNS::raw(static_cast<StorageType>((signA ^ signB) | (mantissaC & MANTISSA_MASK)));
     }
 
     __host__ __device__ LNNS& operator/=(const LNNS& other) {
@@ -401,23 +406,23 @@ struct LNNS {
             value = LOG_ZERO;
             return *this;
         }
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
-        int16_t mantissaC = mantissaA - mantissaB;
-        if(mantissaC > 32767) mantissaC = 32767;
-        if(mantissaC < -32768) mantissaC = -32768;
-        value = (signA ^ signB) << 15 | (mantissaC & 0x7fff);
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
+        SignedStorageType mantissaC = mantissaA - mantissaB;
+        if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
+        if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
+        value = (signA ^ signB) | (mantissaC & MANTISSA_MASK);
         return *this;
     }
 
     __host__ __device__ bool operator<(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return false;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return signA;
         if(signA == 0) return mantissaA < mantissaB;
         else return mantissaA > mantissaB;
@@ -425,10 +430,10 @@ struct LNNS {
 
     __host__ __device__ bool operator<=(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return false;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return signA;
         if(signA == 0) return mantissaA <= mantissaB;
         else return mantissaA >= mantissaB;
@@ -436,10 +441,10 @@ struct LNNS {
 
     __host__ __device__ bool operator>(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return false;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return signB;
         if(signA == 0) return mantissaA > mantissaB;
         else return mantissaA < mantissaB;
@@ -447,10 +452,10 @@ struct LNNS {
 
     __host__ __device__ bool operator>=(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return false;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return signB;
         if(signA == 0) return mantissaA >= mantissaB;
         else return mantissaA <= mantissaB;
@@ -458,20 +463,20 @@ struct LNNS {
 
     __host__ __device__ bool operator==(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return false;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return false;
         return mantissaA == mantissaB;
     }
 
     __host__ __device__ bool operator!=(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return true;
-        int16_t mantissaA = ((value & 0x4000)<<1) | (value & 0x7fff);
-        int16_t mantissaB = ((other.value & 0x4000)<<1) | (other.value & 0x7fff);
-        uint16_t signA = (value >> 15) & 0x1;
-        uint16_t signB = (other.value >> 15) & 0x1;
+        SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
+        StorageType signA = value & SIGN_MASK;
+        StorageType signB = other.value & SIGN_MASK;
         if(signA != signB) return true;
         return mantissaA != mantissaB;
     }
@@ -481,41 +486,41 @@ struct LNNS {
     float toFloat() const {
         if(value == LOG_ZERO) return 0.0f;
         if(value == LOG_NAN) return LNNSMath::Quiet_NAN();
-        int16_t mantissa = ((value & 0x4000)<<1) | (value & 0x7fff);
-	    uint16_t sign = (value >> 15) & 0x1;
-	    float y = ((float)mantissa) / 8.0;
+        SignedStorageType mantissa = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+	    StorageType sign = value & SIGN_MASK;
+	    float y = ((float)mantissa) / SCALE_FACTOR;
 	    float result = LNNSMath::Exp(y);
-	    return (sign == 1) ? -result : result;   
+        return (sign != 0) ? -result : result;
     }
 
     __host__ __device__
     double toDouble() const {
         if(value == LOG_ZERO) return 0.0;
         if(value == LOG_NAN) return LNNSMath::Quiet_NAN();
-        int16_t mantissa = ((value & 0x4000)<<1) | (value & 0x7fff);
-        uint16_t sign = (value >> 15) & 0x1;
-        double y = ((double)mantissa) / 8.0;
+        SignedStorageType mantissa = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        StorageType sign = value & SIGN_MASK;
+        double y = ((double)mantissa) / SCALE_FACTOR;
         double result = LNNSMath::Exp(y);
-        return (sign == 1) ? -result : result;
+        return (sign !=0) ? -result : result;
     }
 
     __host__ __device__
     int toInt() const {
         if(value == LOG_ZERO) return 0;
         if(value == LOG_NAN) return 0;
-        int16_t mantissa = ((value & 0x4000)<<1) | (value & 0x7fff);
-        uint16_t sign = (value >> 15) & 0x1;
-        float y = ((float)mantissa) / 8.0;
+        SignedStorageType mantissa = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        StorageType sign = value & SIGN_MASK;
+        float y = ((float)mantissa) / SCALE_FACTOR;
         float result = LNNSMath::Exp(y);
-        return (sign == 1) ? static_cast<int>(-result) : static_cast<int>(result);
+        return (sign != 0) ? static_cast<int>(-result) : static_cast<int>(result);
     }
 
     __host__ __device__
     unsigned int toUInt() const {
         if(value == LOG_ZERO) return 0;
         if(value == LOG_NAN) return 0;
-        int16_t mantissa = ((value & 0x4000)<<1) | (value & 0x7fff);
-        float y = ((float)mantissa) / 8.0;
+        SignedStorageType mantissa = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
+        float y = ((float)mantissa) / SCALE_FACTOR;
         float result = LNNSMath::Exp(y);
         return static_cast<unsigned int>(result);
     }

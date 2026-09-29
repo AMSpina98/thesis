@@ -44,7 +44,12 @@
  * Computes the vector addition of A and B into C. The 3 vectors have the same
  * number of elements numElements.
  */
-__global__ void vectorAdd(const float *A, const float *B, float *C, int numElements)
+
+ #include "../LNNS_type.cuh"
+
+ using LNNS16_10 = LNNS<uint32_t, 21>; // 16-bit LNNS16_1016 with 10 fractional bits
+
+__global__ void vectorAdd(const LNNS16_10 *A, const LNNS16_10 *B, LNNS16_10 *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -63,17 +68,17 @@ int main(void)
 
     // Print the vector length to be used, and compute its size
     int    numElements = 50000;
-    size_t size        = numElements * sizeof(float);
+    size_t size        = numElements * sizeof(LNNS16_10);
     printf("[Vector addition of %d elements]\n", numElements);
 
     // Allocate the host input vector A
-    float *h_A = (float *)malloc(size);
+    LNNS16_10 *h_A = (LNNS16_10 *)malloc(size);
 
     // Allocate the host input vector B
-    float *h_B = (float *)malloc(size);
+    LNNS16_10 *h_B = (LNNS16_10 *)malloc(size);
 
     // Allocate the host output vector C
-    float *h_C = (float *)malloc(size);
+    LNNS16_10 *h_C = (LNNS16_10 *)malloc(size);
 
     // Verify that allocations succeeded
     if (h_A == NULL || h_B == NULL || h_C == NULL) {
@@ -88,7 +93,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    float *d_A = NULL;
+    LNNS16_10 *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, size);
 
     if (err != cudaSuccess) {
@@ -97,7 +102,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    float *d_B = NULL;
+    LNNS16_10 *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, size);
 
     if (err != cudaSuccess) {
@@ -106,7 +111,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    float *d_C = NULL;
+    LNNS16_10 *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, size);
 
     if (err != cudaSuccess) {
@@ -156,7 +161,7 @@ int main(void)
 
     // Verify that the result vector is correct
     for (int i = 0; i < numElements; ++i) {
-        if (fabs(h_A[i] + h_B[i] - h_C[i]) > 1e-5) {
+        if (fabs((h_A[i] + h_B[i] - h_C[i]).toFloat()) > 1e-5) {
             fprintf(stderr, "Result verification failed at element %d!\n", i);
             exit(EXIT_FAILURE);
         }

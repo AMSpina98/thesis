@@ -52,11 +52,13 @@
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
+using LNNS16_11 = LNNS<uint32_t, 21>; // 16-bit LNNS16_11 with 11 fractional bits
+
 /**
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
  * wA is A's width and wB is B's width
  */
-template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS *C, LNNS *A, LNNS *B, int wA, int wB)
+template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_11 *C, LNNS16_11 *A, LNNS16_11 *B, int wA, int wB)
 {
     // Block index
     int bx = blockIdx.x;
@@ -83,18 +85,18 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS *C, LNNS *A, LNNS *
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
-    LNNS Csub = 0.0f;
+    LNNS16_11 Csub = 0.0f;
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
     for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep) {
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
-        __shared__ LNNS As[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ LNNS16_11 As[BLOCK_SIZE][BLOCK_SIZE];
 
         // Declaration of the shared memory array Bs used to
         // store the sub-matrix of B
-        __shared__ LNNS Bs[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ LNNS16_11 Bs[BLOCK_SIZE][BLOCK_SIZE];
 
         // Load the matrices from device memory
         // to shared memory; each thread loads
@@ -126,7 +128,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS *C, LNNS *A, LNNS *
     C[c + wB * ty + tx] = Csub;
 }
 
-void ConstantInit(LNNS *data, int size, LNNS val)
+void ConstantInit(LNNS16_11 *data, int size, LNNS16_11 val)
 {
     for (int i = 0; i < size; ++i) {
         data[i] = val;
@@ -140,27 +142,27 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 {
     // Allocate host memory for matrices A and B
     unsigned int size_A     = dimsA.x * dimsA.y;
-    unsigned int mem_size_A = sizeof(LNNS) * size_A;
-    LNNS       *h_A;
+    unsigned int mem_size_A = sizeof(LNNS16_11) * size_A;
+    LNNS16_11       *h_A;
     checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
     unsigned int size_B     = dimsB.x * dimsB.y;
-    unsigned int mem_size_B = sizeof(LNNS) * size_B;
-    LNNS       *h_B;
+    unsigned int mem_size_B = sizeof(LNNS16_11) * size_B;
+    LNNS16_11       *h_B;
     checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
     cudaStream_t stream;
 
     // Initialize host memory
-    const LNNS valB = 0.01f;
+    const LNNS16_11 valB = 0.01f;
     ConstantInit(h_A, size_A, 1.0f);
     ConstantInit(h_B, size_B, valB);
 
     // Allocate device memory
-    LNNS *d_A, *d_B, *d_C;
+    LNNS16_11 *d_A, *d_B, *d_C;
 
     // Allocate host matrix C
     dim3         dimsC(dimsB.x, dimsA.y, 1);
-    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(LNNS);
-    LNNS       *h_C;
+    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(LNNS16_11);
+    LNNS16_11       *h_C;
     checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
 
     if (h_C == NULL) {
@@ -204,7 +206,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaEventRecord(start, stream));
 
     // Execute the kernel
-    int nIter = 300;
+    int nIter = 10;
 
     for (int j = 0; j < nIter; j++) {
         if (block_size == 16) {
@@ -248,7 +250,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     double eps = 1.e-6; // machine zero
 
     for (int i = 0; i < static_cast<int>(dimsC.x * dimsC.y); i++) {
-        double abs_err = fabs(h_C[i].toFloat() - (dimsA.x * valB));
+        double abs_err = fabs(h_C[i].toFloat() - (dimsA.x * valB.toFloat()));
         double dot_length = dimsA.x;
         double abs_val = fabs(h_C[i].toFloat());
         double rel_err    = abs_err / abs_val / dot_length;
@@ -257,7 +259,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
             printf("Error! Matrix[%05d]=%.12e, ref=%.12e, abs_err=%.12e, rel_err=%.12e\n",
                 i,
                 h_C[i].toDouble(),
-                (double)(dimsA.x * valB),
+                (double)(dimsA.x * valB.toFloat()),
                 abs_err,
                 rel_err);
             correct = false;
