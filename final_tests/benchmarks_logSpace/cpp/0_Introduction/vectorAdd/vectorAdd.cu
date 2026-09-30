@@ -54,7 +54,7 @@ __global__ void vectorAdd(const LNNS16_10 *A, const LNNS16_10 *B, LNNS16_10 *C, 
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i < numElements) {
-        C[i] = A[i] + B[i] + 0.0f;
+        C[i] = A[i] + B[i] + LNNS16_10(0.0f);
     }
 }
 

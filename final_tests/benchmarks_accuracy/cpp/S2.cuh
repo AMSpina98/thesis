@@ -250,8 +250,8 @@ struct LNNS {
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
         float ya = ((float)mMax) / SCALE_FACTOR;
-        float yb = ((float)mMin) / SCALE_FACTOR;
-        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        float diff = ((float)(mMin - mMax)) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(diff)));
         SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
         if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
         if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
@@ -282,8 +282,8 @@ struct LNNS {
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
         float ya = ((float)mMax) / SCALE_FACTOR;
-        float yb = ((float)mMin) / SCALE_FACTOR;
-        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));;
+        float diff = ((float)(mMin - mMax)) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(diff)));
         SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
         if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
         if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
@@ -306,8 +306,8 @@ struct LNNS {
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
         float ya = ((float)mMax) / SCALE_FACTOR;
-        float yb = ((float)mMin) / SCALE_FACTOR;
-        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        float diff = ((float)(mMin - mMax)) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(diff)));
         SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
         if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
         if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
@@ -338,8 +338,8 @@ struct LNNS {
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
         float ya = ((float)mMax) / SCALE_FACTOR;
-        float yb = ((float)mMin) / SCALE_FACTOR;
-        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
+        float diff = ((float)(mMin - mMax)) / SCALE_FACTOR;
+        float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(diff)));
         SignedStorageType mantissaC = (LNNSMath::NearbyInt(yc * SCALE_FACTOR));
         if(mantissaC > MAX_MANTISSA) mantissaC = MAX_MANTISSA;
         if(mantissaC < MIN_MANTISSA) mantissaC = MIN_MANTISSA;
@@ -520,6 +520,10 @@ struct LNNS {
         float result = LNNSMath::Exp(y);
         return static_cast<unsigned int>(result);
     }
+    operator float() const { return toFloat(); }
+    operator double() const { return toDouble(); }
+    operator int() const { return toInt(); }
+    operator unsigned int() const { return toUInt(); }
 
 
 };

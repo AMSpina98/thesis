@@ -520,6 +520,10 @@ struct LNNS {
         float result = LNNSMath::Exp(y);
         return static_cast<unsigned int>(result);
     }
+    operator float() const { return toFloat(); }
+    operator double() const { return toDouble(); }
+    operator int() const { return toInt(); }
+    operator unsigned int() const { return toUInt(); }
 
 
 };

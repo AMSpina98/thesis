@@ -39,7 +39,7 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 
-#include "../utility.cu"
+#include "../../utility.cu"
 
 /**
  * CUDA Kernel Device code
@@ -48,7 +48,7 @@
  * number of elements numElements.
  */
 
-#include "../LNNS_type.cuh"
+#include "../../S2.cuh"
 
 using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_21 with 21 fractional bits
 

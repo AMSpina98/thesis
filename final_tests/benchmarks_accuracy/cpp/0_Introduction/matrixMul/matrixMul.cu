@@ -46,8 +46,8 @@
 // CUDA runtime
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
-#include "./../LNNS_type.cuh"
-#include "../utility.cu"
+#include "./../../S2.cuh"
+#include "../../utility.cu"
 
 // Helper functions and utilities to work with CUDA
 #include <helper_cuda.h>

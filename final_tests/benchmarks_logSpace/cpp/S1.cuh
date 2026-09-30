@@ -383,4 +383,8 @@ struct Encapsulator {
     __host__ __device__ unsigned int toUInt() const {
         return static_cast<unsigned int>(value);
     }
+    operator float() const { return toFloat(); }
+    operator double() const { return toDouble(); }
+    operator int() const { return toInt(); }
+    operator unsigned int() const { return toUInt(); }
 };

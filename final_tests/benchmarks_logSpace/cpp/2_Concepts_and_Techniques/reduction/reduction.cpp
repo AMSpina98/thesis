@@ -64,8 +64,12 @@
 // CUDA Runtime\
 #include <cuda_runtime.h>
 #include "../../S2.cuh"
+#include "../../S1.cuh"
 
-using LNNS16_10 = LNNS<uint16_t, 10>;
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+
 
 // Utilities and system includes
 #include <algorithm>
@@ -75,7 +79,7 @@ using LNNS16_10 = LNNS<uint16_t, 10>;
 // includes, project
 #include "reduction.h"
 
-enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE };
+enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE, REDUCE_S2_16_10, REDUCE_S2_16_11, REDUCE_S2_32_21, REDUCE_ENCAPSULATOR_FLOAT, REDUCE_ENCAPSULATOR_DOUBLE };
 
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
@@ -98,6 +102,16 @@ const char *getReduceTypeString(const ReduceType type)
         return "float";
     case REDUCE_DOUBLE:
         return "double";
+    case REDUCE_S2_16_10:
+        return "S2_16_10";
+    case REDUCE_S2_16_11:
+        return "S2_16_11";
+    case REDUCE_S2_32_21:
+        return "S2_32_21";
+    case REDUCE_ENCAPSULATOR_FLOAT:
+        return "Encapsulator<float>";
+    case REDUCE_ENCAPSULATOR_DOUBLE:
+        return "Encapsulator<double>";
     default:
         return "unknown";
     }
@@ -121,6 +135,21 @@ int main(int argc, char **argv)
         }
         else if (!strcasecmp(typeInput, "double")) {
             datatype = REDUCE_DOUBLE;
+        }
+        else if (!strcasecmp(typeInput, "S2_16_10")) {
+            datatype = REDUCE_S2_16_10;
+        }
+        else if (!strcasecmp(typeInput, "S2_16_11")) {
+            datatype = REDUCE_S2_16_11;
+        }
+        else if (!strcasecmp(typeInput, "S2_32_21")) {
+            datatype = REDUCE_S2_32_21;
+        }
+        else if (!strcasecmp(typeInput, "Encapsulator<float>")) {
+            datatype = REDUCE_ENCAPSULATOR_FLOAT;
+        }
+        else if (!strcasecmp(typeInput, "Encapsulator<double>")) {
+            datatype = REDUCE_ENCAPSULATOR_DOUBLE;
         }
         else if (strcasecmp(typeInput, "int")) {
             printf("Type %s is not recognized. Using default type int.\n\n", typeInput);
@@ -153,6 +182,21 @@ int main(int argc, char **argv)
 
     case REDUCE_DOUBLE:
         bResult = runTest<double>(argc, argv, datatype);
+        break;
+    case REDUCE_S2_16_10:
+        bResult = runTest<S2_16_10>(argc, argv, datatype);
+        break;
+    case REDUCE_S2_16_11:
+        bResult = runTest<S2_16_11>(argc, argv, datatype);
+        break;
+    case REDUCE_S2_32_21:
+        bResult = runTest<S2_32_21>(argc, argv, datatype);
+        break;
+    case REDUCE_ENCAPSULATOR_FLOAT:
+        bResult = runTest<Encapsulator<float>>(argc, argv, datatype);
+        break;
+    case REDUCE_ENCAPSULATOR_DOUBLE:
+        bResult = runTest<Encapsulator<double>>(argc, argv, datatype);
         break;
     }
 
@@ -204,7 +248,7 @@ unsigned int nextPow2(unsigned int x)
 // n.  For kernel 6, we observe the maximum specified number of blocks, because
 // each thread in that kernel can process a variable number of elements.
 ////////////////////////////////////////////////////////////////////////////////
-void getNumBlocksAndThreads(int whichKernel, int n, int maxBlocks, int maxThreads, int &blocks, int &threads)
+void getNumBlocksAndThreads(int n, int maxBlocks, int maxThreads, int &blocks, int &threads)
 {
     // get device capability, to avoid block/grid size exceed the upper bound
     cudaDeviceProp prop;
@@ -212,15 +256,9 @@ void getNumBlocksAndThreads(int whichKernel, int n, int maxBlocks, int maxThread
     checkCudaErrors(cudaGetDevice(&device));
     checkCudaErrors(cudaGetDeviceProperties(&prop, device));
 
-    if (whichKernel < 3) {
-        threads = (n < maxThreads) ? nextPow2(n) : maxThreads;
-        blocks  = (n + threads - 1) / threads;
-    }
-    else {
-        threads = (n < maxThreads * 2) ? nextPow2((n + 1) / 2) : maxThreads;
-        blocks  = (n + (threads * 2 - 1)) / (threads * 2);
-    }
-
+    threads = (n < maxThreads) ? nextPow2(n) : maxThreads;
+    blocks  = (n + threads - 1) / threads;
+    
     if ((float)threads * blocks > (float)prop.maxGridSize[0] * prop.maxThreadsPerBlock) {
         printf("n is too large, please choose a smaller number!\n");
     }
@@ -236,10 +274,6 @@ void getNumBlocksAndThreads(int whichKernel, int n, int maxBlocks, int maxThread
         blocks /= 2;
         threads *= 2;
     }
-
-    if (whichKernel >= 6) {
-        blocks = MIN(maxBlocks, blocks);
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +286,6 @@ T benchmarkReduce(int                 n,
                   int                 numBlocks,
                   int                 maxThreads,
                   int                 maxBlocks,
-                  int                 whichKernel,
                   int                 testIterations,
                   bool                cpuFinalReduction,
                   int                 cpuFinalThreshold,
@@ -274,7 +307,7 @@ T benchmarkReduce(int                 n,
         sdkStartTimer(&timer);
 
         // execute the kernel
-        reduce<T>(n, numThreads, numBlocks, whichKernel, d_idata, d_odata);
+        reduce<T>(n, numThreads, numBlocks, d_idata, d_odata);
 
         // check if kernel execution generated an error
         getLastCudaError("Kernel execution failed");
@@ -293,20 +326,14 @@ T benchmarkReduce(int                 n,
         else {
             // sum partial block sums on GPU
             int s      = numBlocks;
-            int kernel = whichKernel;
 
             while (s > cpuFinalThreshold) {
                 int threads = 0, blocks = 0;
-                getNumBlocksAndThreads(kernel, s, maxBlocks, maxThreads, blocks, threads);
+                getNumBlocksAndThreads(s, maxBlocks, maxThreads, blocks, threads);
                 checkCudaErrors(cudaMemcpy(d_intermediateSums, d_odata, s * sizeof(T), cudaMemcpyDeviceToDevice));
-                reduce<T>(s, threads, blocks, kernel, d_intermediateSums, d_odata);
+                reduce<T>(s, threads, blocks, d_intermediateSums, d_odata);
 
-                if (kernel < 3) {
-                    s = (s + threads - 1) / threads;
-                }
-                else {
-                    s = (s + (threads * 2 - 1)) / (threads * 2);
-                }
+                s = (s + threads - 1) / threads;
             }
 
             if (s > 1) {
@@ -372,60 +399,45 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
     checkCudaErrors(cudaMemcpy(d_idata, h_idata, bytes, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_odata, h_idata, maxNumBlocks * sizeof(T), cudaMemcpyHostToDevice));
 
-    // warm-up
-    for (int kernel = 0; kernel < 8; kernel++) {
-        reduce<T>(maxN, maxThreads, maxNumBlocks, kernel, d_idata, d_odata);
-    }
+    reduce<T>(maxN, maxThreads, maxNumBlocks, d_idata, d_odata);
+    
 
     int testIterations = 100;
 
     StopWatchInterface *timer = 0;
     sdkCreateTimer(&timer);
 
-    // print headers
-    printf("Time in milliseconds for various numbers of elements for each "
-           "kernel\n\n\n");
-    printf("Kernel");
 
     for (int i = minN; i <= maxN; i *= 2) {
-        printf(", %d", i);
-    }
+        sdkResetTimer(&timer);
+        int numBlocks  = 0;
+        int numThreads = 0;
+        getNumBlocksAndThreads(i, maxBlocks, maxThreads, numBlocks, numThreads);
 
-    for (int kernel = 0; kernel < 8; kernel++) {
-        printf("\n%d", kernel);
+        float reduceTime;
 
-        for (int i = minN; i <= maxN; i *= 2) {
-            sdkResetTimer(&timer);
-            int numBlocks  = 0;
-            int numThreads = 0;
-            getNumBlocksAndThreads(kernel, i, maxBlocks, maxThreads, numBlocks, numThreads);
-
-            float reduceTime;
-
-            if (numBlocks <= MAX_BLOCK_DIM_SIZE) {
-                benchmarkReduce(i,
-                                numThreads,
-                                numBlocks,
-                                maxThreads,
-                                maxBlocks,
-                                kernel,
-                                testIterations,
-                                false,
-                                1,
-                                timer,
-                                h_odata,
-                                d_idata,
-                                d_odata);
-                reduceTime = sdkGetAverageTimerValue(&timer);
-            }
-            else {
-                reduceTime = -1.0;
-            }
-
-            printf(", %.5f", reduceTime);
+        if (numBlocks <= MAX_BLOCK_DIM_SIZE) {
+            benchmarkReduce(i,
+                            numThreads,
+                            numBlocks,
+                            maxThreads,
+                            maxBlocks,
+                            testIterations,
+                            false,
+                            1,
+                            timer,
+                            h_odata,
+                            d_idata,
+                            d_odata);
+            reduceTime = sdkGetAverageTimerValue(&timer);
         }
-    }
+        else {
+            reduceTime = -1.0;
+        }
 
+        printf(", %.5f", reduceTime);
+    }
+    
     // cleanup
     sdkDeleteTimer(&timer);
     free(h_idata);
@@ -442,7 +454,6 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
 {
     int  size              = 1 << 24; // number of elements to reduce
     int  maxThreads        = 256;     // number of threads per block
-    int  whichKernel       = 7;
     int  maxBlocks         = 64;
     bool cpuFinalReduction = false;
     int  cpuFinalThreshold = 1;
@@ -453,10 +464,6 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
 
     if (checkCmdLineFlag(argc, (const char **)argv, "threads")) {
         maxThreads = getCmdLineArgumentInt(argc, (const char **)argv, "threads");
-    }
-
-    if (checkCmdLineFlag(argc, (const char **)argv, "kernel")) {
-        whichKernel = getCmdLineArgumentInt(argc, (const char **)argv, "kernel");
     }
 
     if (checkCmdLineFlag(argc, (const char **)argv, "maxblocks")) {
@@ -495,7 +502,7 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
 
         int numBlocks  = 0;
         int numThreads = 0;
-        getNumBlocksAndThreads(whichKernel, size, maxBlocks, maxThreads, numBlocks, numThreads);
+        getNumBlocksAndThreads(size, maxBlocks, maxThreads, numBlocks, numThreads);
 
         if (numBlocks == 1) {
             cpuFinalThreshold = 1;
@@ -518,7 +525,7 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
         checkCudaErrors(cudaMemcpy(d_odata, h_idata, numBlocks * sizeof(T), cudaMemcpyHostToDevice));
 
         // warm-up
-        reduce<T>(size, numThreads, numBlocks, whichKernel, d_idata, d_odata);
+        reduce<T>(size, numThreads, numBlocks, d_idata, d_odata);
 
         int testIterations = 100;
 
@@ -532,7 +539,6 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
                                         numBlocks,
                                         maxThreads,
                                         maxBlocks,
-                                        whichKernel,
                                         testIterations,
                                         cpuFinalReduction,
                                         cpuFinalThreshold,
@@ -565,6 +571,26 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
             if (datatype == REDUCE_FLOAT) {
                 precision = 8;
                 threshold = 1e-8 * size;
+            }
+            else if (datatype == REDUCE_S2_16_10) {
+                precision = 8;
+                threshold = 1e-4 * size;
+            }
+            else if (datatype == REDUCE_S2_16_11) {
+                precision = 8;
+                threshold = 1e-4 * size;
+            }
+            else if (datatype == REDUCE_S2_32_21) {
+                precision = 12;
+                threshold = 1e-8 * size;
+            }
+            else if (datatype == REDUCE_ENCAPSULATOR_FLOAT) {
+                precision = 8;
+                threshold = 1e-8 * size;
+            }
+            else if (datatype == REDUCE_ENCAPSULATOR_DOUBLE) {
+                precision = 16;
+                threshold = 1e-12 * size;
             }
             else {
                 precision = 12;

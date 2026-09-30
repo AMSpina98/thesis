@@ -42,7 +42,7 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 
-#include "../utility.cu"
+#include "../../utility.cu"
 /**
  * CUDA Kernel Device code
  *
@@ -50,7 +50,7 @@
  * number of elements numElements.
  */
 
- #include "../LNNS_type.cuh"
+ #include "../../S2.cuh"
 
  using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_2116 with 21 fractional bits
 
@@ -59,7 +59,7 @@ __global__ void vectorAdd(const LNNS16_21 *A, const LNNS16_21 *B, LNNS16_21 *C, 
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i < numElements) {
-        C[i] = A[i] + B[i] + 0.0f;
+        C[i] = A[i] + B[i] + LNNS16_21(0.0f);
     }
 }
 
