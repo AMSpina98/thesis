@@ -45,7 +45,7 @@
  * and the vectors x and y have the same number of elements.
  */
 
-#include "../LNNS_type.cuh"
+#include "../../LNNS_type.cuh"
 
 using LNNS16_11 = LNNS<uint32_t, 21>; // 16-bit LNNS16_11 with 11 fractional bits
 

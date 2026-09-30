@@ -249,7 +249,6 @@ struct LNNS {
         SignedStorageType mMax = swapped ? mantissaB : mantissaA;
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
-        StorageType signB_new  = swapped ? signA : signB;
         float ya = ((float)mMax) / SCALE_FACTOR;
         float yb = ((float)mMin) / SCALE_FACTOR;
         float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
@@ -282,7 +281,6 @@ struct LNNS {
         SignedStorageType mMax = swapped ? mantissaB : mantissaA;
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
-        StorageType signB_new  = swapped ? signA : signB;
         float ya = ((float)mMax) / SCALE_FACTOR;
         float yb = ((float)mMin) / SCALE_FACTOR;
         float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));;
@@ -307,7 +305,6 @@ struct LNNS {
         SignedStorageType mMax = swapped ? mantissaB : mantissaA;
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
-        StorageType signB_new  = swapped ? signA : signB;
         float ya = ((float)mMax) / SCALE_FACTOR;
         float yb = ((float)mMin) / SCALE_FACTOR;
         float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));
@@ -340,7 +337,6 @@ struct LNNS {
         SignedStorageType mMax = swapped ? mantissaB : mantissaA;
         SignedStorageType mMin = swapped ? mantissaA : mantissaB;
         StorageType signA_new  = swapped ? signB : signA;
-        StorageType signB_new  = swapped ? signA : signB;
         float ya = ((float)mMax) / SCALE_FACTOR;
         float yb = ((float)mMin) / SCALE_FACTOR;
         float yc = ya + LNNSMath::Log(1.0f + (s * LNNSMath::Exp(yb - ya)));

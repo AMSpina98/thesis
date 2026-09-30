@@ -45,9 +45,9 @@
  * number of elements numElements.
  */
 
- #include "../LNNS_type.cuh"
+ #include "../../LNNS_type.cuh"
 
- using LNNS16_10 = LNNS<uint32_t, 21>; // 16-bit LNNS16_1016 with 10 fractional bits
+ using LNNS16_10 = LNNS<uint16_t, 10>; // 16-bit LNNS16_1016 with 10 fractional bits
 
 __global__ void vectorAdd(const LNNS16_10 *A, const LNNS16_10 *B, LNNS16_10 *C, int numElements)
 {

@@ -46,13 +46,13 @@
 // CUDA runtime
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
-#include "./../LNNS_type.cuh"
+#include "../../LNNS_type.cuh"
 
 // Helper functions and utilities to work with CUDA
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
-using LNNS16_11 = LNNS<uint32_t, 21>; // 16-bit LNNS16_11 with 11 fractional bits
+using LNNS16_11 = LNNS<uint16_t, 10>; // 16-bit LNNS16_11 with 11 fractional bits
 
 /**
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B

@@ -34,6 +34,9 @@
  */
 
 #include <stdio.h>
+#include <vector>
+#include <algorithm>
+#include <cmath>
 
 // For the CUDA runtime routines (prefixed with "cuda_")
 #include <cuda_runtime.h>
@@ -214,10 +217,24 @@ int main(void)
     cudaEvent_t startE, stopE;
 	cudaEventCreate(&startE);
 	cudaEventCreate(&stopE);
-	float elapsed = 0.0f;
-	float elapsed_float = 0.0f;
 
-    int nIter = 300000;
+    int nWarmup = 200;   // scartati dalla misura: portano il clock GPU a regime
+    int nIter   = 300000;
+
+    // --- Warm-up (non cronometrato) ---
+    for (int i = 0; i < nWarmup; i++) {
+        vectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, numElements);
+        originalVectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A_float, d_B_float, d_C_float, numElements);
+    }
+    cudaDeviceSynchronize();
+
+    // --- Run cronometrati: si tiene traccia di ogni singolo campione, non solo
+    // della somma, per poter calcolare mediana/deviazione standard/p95 oltre
+    // alla media (la sola media può restare ingannevole anche su tanti run se
+    // la distribuzione ha una coda lunga di outlier). ---
+    std::vector<float> samplesLNNS(nIter);
+    std::vector<float> samplesFloat(nIter);
+
     for (int i = 0; i < nIter; i++) {
         cudaEventRecord(startE);
 
@@ -225,9 +242,7 @@ int main(void)
 
         cudaEventRecord(stopE);
         cudaEventSynchronize(stopE);
-        float elapsed_step;
-        cudaEventElapsedTime(&elapsed_step, startE, stopE);
-        elapsed += elapsed_step;
+        cudaEventElapsedTime(&samplesLNNS[i], startE, stopE);
 
         err = cudaGetLastError();
 
@@ -236,16 +251,14 @@ int main(void)
             exit(EXIT_FAILURE);
         }
 
-        
+
         cudaEventRecord(startE);
 
         originalVectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A_float, d_B_float, d_C_float, numElements);
 
         cudaEventRecord(stopE);
         cudaEventSynchronize(stopE);
-        float elapsed_float_step;
-        cudaEventElapsedTime(&elapsed_float_step, startE, stopE);
-        elapsed_float += elapsed_float_step;
+        cudaEventElapsedTime(&samplesFloat[i], startE, stopE);
 
         err = cudaGetLastError();
 
@@ -254,8 +267,29 @@ int main(void)
             exit(EXIT_FAILURE);
         }
     }
-    elapsed /= nIter;
-    elapsed_float /= nIter;
+
+    auto computeStats = [](std::vector<float> samples, float& mean, float& median, float& stddev, float& p95) {
+        size_t n = samples.size();
+        double sum = 0.0;
+        for (float v : samples) sum += v;
+        mean = static_cast<float>(sum / n);
+
+        double sqSum = 0.0;
+        for (float v : samples) sqSum += (double(v) - mean) * (double(v) - mean);
+        stddev = static_cast<float>(std::sqrt(sqSum / n));
+
+        std::sort(samples.begin(), samples.end());
+        median = samples[n / 2];
+        p95    = samples[static_cast<size_t>(0.95 * n)];
+    };
+
+    float meanLNNS, medianLNNS, stddevLNNS, p95LNNS;
+    float meanFloat, medianFloat, stddevFloat, p95Float;
+    computeStats(samplesLNNS, meanLNNS, medianLNNS, stddevLNNS, p95LNNS);
+    computeStats(samplesFloat, meanFloat, medianFloat, stddevFloat, p95Float);
+
+    float elapsed = meanLNNS;
+    float elapsed_float = meanFloat;
     // Copy the device result vector in device memory to the host result vector
     // in host memory.
     printf("Copy output data from the CUDA device to the host memory\n");
@@ -392,6 +426,14 @@ int main(void)
         numElements,
         elapsed,
         elapsed_float
+    );
+
+    saveTimingStatsCSV(
+        "vectorAdd_timing_stats.csv",
+        "LNNS16_21",
+        numElements,
+        meanLNNS, medianLNNS, stddevLNNS, p95LNNS,
+        meanFloat, medianFloat, stddevFloat, p95Float
     );
 
 
