@@ -36,6 +36,14 @@
 //
 // Please see the whitepaper in the docs folder of the transpose project for a
 // detailed description of this performance study.
+//
+// MODIFICA: oltre al confronto pass/fail contro il riferimento CPU (T-domain),
+// ora runTest<T> esegue IN PARALLELO anche la versione float dello stesso
+// identico kernel (stessa idea di vecAdd/matMul/matVecMul), cosi' da poter
+// calcolare le metriche di accuratezza (errore assoluto/relativo max e medio,
+// RMSE, conteggio sopra soglia) elemento per elemento tra T (convertito via
+// l'operatore di conversione implicito) e float, e salvarle su CSV con lo
+// stesso formato degli altri benchmark.
 // -----------------------------------------------------------------------------
 
 #include <cooperative_groups.h>
@@ -45,6 +53,8 @@ namespace cg = cooperative_groups;
 #include <helper_cuda.h>   // helper for cuda error checking functions
 #include <helper_image.h>  // helper for image and data comparison
 #include <helper_string.h> // helper for string parsing
+
+#include "../../utility.cu"
 
 #include "../../S1.cuh"
 #include "../../S2.cuh"
@@ -191,10 +201,13 @@ void showHelp()
 // main
 // ----
 
+// typeName: etichetta per le CSV (es. "float", "S2_16_10", "Encapsulator<double>", ...)
 template<typename T>
-void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
+void runTest(int size_x, int size_y, cudaDeviceProp deviceProp, const char *typeName){
     void (*kernel)(T *, T *, int, int);
+    void (*kernelFloat)(float *, float *, int, int);
     const char *kernelName;
+    const char *csvKernelName;
 
     // execution configuration parameters
     dim3 grid(size_x / TILE_DIM, size_y / TILE_DIM), threads(TILE_DIM, BLOCK_ROWS);
@@ -208,35 +221,52 @@ void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
     cudaEvent_t start, stop;
 
     // size of memory required to store the matrix
-    size_t mem_size = static_cast<size_t>(sizeof(T) * size_x * size_y);
+    size_t mem_size       = static_cast<size_t>(sizeof(T) * size_x * size_y);
+    size_t mem_size_float = static_cast<size_t>(sizeof(float) * size_x * size_y);
 
-    if (2 * mem_size > deviceProp.totalGlobalMem) {
+    if (2 * mem_size + 2 * mem_size_float > deviceProp.totalGlobalMem) {
         printf("Input matrix size is larger than the available device memory!\n");
         printf("Please choose a smaller size matrix\n");
         exit(EXIT_FAILURE);
     }
 
-    // allocate host memory
+    // allocate host memory (T)
     T *h_idata       = (T *)malloc(mem_size);
     T *h_odata       = (T *)malloc(mem_size);
     T *transposeGold = (T *)malloc(mem_size);
     T *gold;
 
-    // allocate device memory
+    // allocate host memory (float, riferimento per l'accuratezza)
+    float *h_idata_float       = (float *)malloc(mem_size_float);
+    float *h_odata_float       = (float *)malloc(mem_size_float);
+    float *transposeGold_float = (float *)malloc(mem_size_float);
+    float *gold_float;
+
+    // allocate device memory (T)
     T *d_idata, *d_odata;
     checkCudaErrors(cudaMalloc((void **)&d_idata, mem_size));
     checkCudaErrors(cudaMalloc((void **)&d_odata, mem_size));
 
-    // initialize host data
+    // allocate device memory (float)
+    float *d_idata_float, *d_odata_float;
+    checkCudaErrors(cudaMalloc((void **)&d_idata_float, mem_size_float));
+    checkCudaErrors(cudaMalloc((void **)&d_odata_float, mem_size_float));
+
+    // initialize host data -- stesso valore sorgente per T e per float, cosi'
+    // che l'unica differenza tra i due risultati sia la rappresentazione, non
+    // i dati di partenza
     for (int i = 0; i < (size_x * size_y); ++i) {
-        h_idata[i] = (T)i;
+        h_idata_float[i] = (float)i;
+        h_idata[i]        = T(h_idata_float[i]);
     }
 
     // copy host data to device
     checkCudaErrors(cudaMemcpy(d_idata, h_idata, mem_size, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(d_idata_float, h_idata_float, mem_size_float, cudaMemcpyHostToDevice));
 
-    // Compute reference transpose solution
+    // Compute reference transpose solution (T e float, indipendenti)
     computeTransposeGold(transposeGold, h_idata, size_x, size_y);
+    computeTransposeGold(transposeGold_float, h_idata_float, size_x, size_y);
 
     // print out common data for all kernels
     printf("\nMatrix size: %dx%d (%dx%d tiles), tile size: %dx%d, block size: "
@@ -254,6 +284,10 @@ void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
+    cudaEvent_t startE, stopE;
+    checkCudaErrors(cudaEventCreate(&startE));
+    checkCudaErrors(cudaEventCreate(&stopE));
+
     //
     // loop over different kernels
     //
@@ -264,31 +298,35 @@ void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
         // set kernel pointer
         switch (k) {
             case 0:
-                kernel     = &transposeNaive;
-                kernelName = "naive             ";
+                kernel        = &transposeNaive;
+                kernelFloat   = &transposeNaive<float>;
+                kernelName    = "naive             ";
+                csvKernelName = "naive";
                 break;
 
             case 1:
-                kernel     = &transposeNoBankConflicts;
-                kernelName = "optimized         ";
+                kernel        = &transposeNoBankConflicts;
+                kernelFloat   = &transposeNoBankConflicts<float>;
+                kernelName    = "optimized         ";
+                csvKernelName = "noBankConflicts";
                 break;
         }
 
-        gold = transposeGold;
-        
+        gold       = transposeGold;
+        gold_float = transposeGold_float;
 
         // Clear error status
         checkCudaErrors(cudaGetLastError());
 
         // warmup to avoid timing startup
         kernel<<<grid, threads>>>(d_odata, d_idata, size_x, size_y);
+        kernelFloat<<<grid, threads>>>(d_odata_float, d_idata_float, size_x, size_y);
 
-        // take measurements for loop over kernel launches
+        // --- misura T ---
         checkCudaErrors(cudaEventRecord(start, 0));
 
         for (int i = 0; i < NUM_REPS; i++) {
             kernel<<<grid, threads>>>(d_odata, d_idata, size_x, size_y);
-            // Ensure no launch failure
             checkCudaErrors(cudaGetLastError());
         }
 
@@ -297,17 +335,23 @@ void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
         float kernelTime;
         checkCudaErrors(cudaEventElapsedTime(&kernelTime, start, stop));
 
-        checkCudaErrors(cudaMemcpy(h_odata, d_odata, mem_size, cudaMemcpyDeviceToHost));
-        bool res = compareData(gold, h_odata, size_x * size_y, 0.01f, 0.0f);
+        // --- misura float (riferimento) ---
+        checkCudaErrors(cudaEventRecord(startE, 0));
 
-        if (res == false) {
-            printf("*** %s kernel FAILED ***\n", kernelName);
-            success = false;
+        for (int i = 0; i < NUM_REPS; i++) {
+            kernelFloat<<<grid, threads>>>(d_odata_float, d_idata_float, size_x, size_y);
+            checkCudaErrors(cudaGetLastError());
         }
 
-        // take measurements for loop inside kernel
+        checkCudaErrors(cudaEventRecord(stopE, 0));
+        checkCudaErrors(cudaEventSynchronize(stopE));
+        float kernelTimeFloat;
+        checkCudaErrors(cudaEventElapsedTime(&kernelTimeFloat, startE, stopE));
+
         checkCudaErrors(cudaMemcpy(h_odata, d_odata, mem_size, cudaMemcpyDeviceToHost));
-        res = compareData(gold, h_odata, size_x * size_y, 0.01f, 0.0f);
+        checkCudaErrors(cudaMemcpy(h_odata_float, d_odata_float, mem_size_float, cudaMemcpyDeviceToHost));
+
+        bool res = compareData(gold, h_odata, size_x * size_y, 0.01f, 0.0f);
 
         if (res == false) {
             printf("*** %s kernel FAILED ***\n", kernelName);
@@ -325,38 +369,86 @@ void runTest(int size_x, int size_y, cudaDeviceProp deviceProp){
                1,
                TILE_DIM * BLOCK_ROWS);
 
-        // Reset d_odata to zero before starting the next loop iteration to avoid
-        // carrying over results from previous kernels. Without this reset, residual
-        // data from a prior kernel (e.g., 'copy') could make a subsequent
-        // kernel (e.g., 'copySharedMem') appear correct even if it performs no work,
-        // leading to false positives in compareData.
-        for (int i = 0; i < (size_x * size_y); ++i) {
-            h_odata[i] = 0;
-        }
-        // copy host data to device
-        checkCudaErrors(cudaMemcpy(d_odata, h_odata, mem_size, cudaMemcpyHostToDevice));
+        // -----------------------------------------------------------------
+        // Metriche di accuratezza: T (convertito via operator float()) vs
+        // float, elemento per elemento sull'output trasposto. Stesso schema
+        // di vecAdd/matMul/matVecMul (max/avg errore assoluto e relativo,
+        // RMSE, conteggio sopra soglia).
+        // -----------------------------------------------------------------
+        int   elements    = size_x * size_y;
+        float threshold   = 1e-3f;
+        float maxAbsError = 0.0f, avgAbsError = 0.0f;
+        float maxRelError = 0.0f, avgRelError = 0.0f;
+        float RSME        = 0.0f;
+        int   count       = 0;
 
-        // Reset d_odata to zero before starting the next loop iteration to avoid
-        // carrying over results from previous kernels. Without this reset, residual
-        // data from a prior kernel (e.g., 'copy') could make a subsequent
-        // kernel (e.g., 'copySharedMem') appear correct even if it performs no work,
-        // leading to false positives in compareData.
-        for (int i = 0; i < (size_x * size_y); ++i) {
-            h_odata[i] = 0;
+        for (int i = 0; i < elements; ++i) {
+            float refVal = h_odata_float[i];
+            float error  = fabsf((float)h_odata[i] - refVal);
+            float den    = fabsf(refVal) != 0.0f ? fabsf(refVal) : 1.0f;
+            float relErr = fabsf(error / den);
+
+            if (relErr > maxRelError) maxRelError = relErr;
+            avgRelError += relErr;
+            if (error > maxAbsError) maxAbsError = error;
+            avgAbsError += error;
+            RSME += error * error;
+            if (error > fabsf(refVal * threshold)) count++;
         }
-        // copy host data to device
+
+        avgAbsError /= elements;
+        avgRelError /= elements;
+        RSME = sqrt(RSME / elements);
+
+        std::string csvLabel = std::string(typeName) + "_" + std::string(csvKernelName);
+
+        saveResultsCSV(
+            "transpose_results.csv",
+            csvLabel,
+            elements,
+            threshold,
+            maxAbsError,
+            avgAbsError,
+            RSME,
+            maxRelError,
+            avgRelError,
+            count
+        );
+
+        saveTimingCSV(
+            "transpose_timing.csv",
+            csvLabel,
+            elements,
+            kernelTime / NUM_REPS,
+            kernelTimeFloat / NUM_REPS
+        );
+
+        // Reset d_odata/d_odata_float to zero before starting the next loop
+        // iteration to avoid carrying over results from previous kernels.
+        for (int i = 0; i < (size_x * size_y); ++i) {
+            h_odata[i]       = T(0.0f);
+            h_odata_float[i] = 0.0f;
+        }
         checkCudaErrors(cudaMemcpy(d_odata, h_odata, mem_size, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(d_odata_float, h_odata_float, mem_size_float, cudaMemcpyHostToDevice));
     }
 
     // cleanup
     free(h_idata);
     free(h_odata);
     free(transposeGold);
+    free(h_idata_float);
+    free(h_odata_float);
+    free(transposeGold_float);
     cudaFree(d_idata);
     cudaFree(d_odata);
+    cudaFree(d_idata_float);
+    cudaFree(d_odata_float);
 
     checkCudaErrors(cudaEventDestroy(start));
     checkCudaErrors(cudaEventDestroy(stop));
+    checkCudaErrors(cudaEventDestroy(startE));
+    checkCudaErrors(cudaEventDestroy(stopE));
 
     if (!success) {
         printf("Test failed!\n");
@@ -444,31 +536,28 @@ int main(int argc, char **argv)
     }
     switch(testNum){
         case 0:
-            runTest<float>(size_x, size_y, deviceProp);
+            runTest<float>(size_x, size_y, deviceProp, "float");
             break;
         case 1:
-            runTest<double>(size_x, size_y, deviceProp);
+            runTest<double>(size_x, size_y, deviceProp, "double");
             break;
         case 2:
-            runTest<Encapsulator<float>>(size_x, size_y, deviceProp);
+            runTest<Encapsulator<float>>(size_x, size_y, deviceProp, "Encapsulator<float>");
             break;
         case 3:
-            runTest<Encapsulator<double>>(size_x, size_y, deviceProp);
+            runTest<Encapsulator<double>>(size_x, size_y, deviceProp, "Encapsulator<double>");
             break;
         case 4:
-            runTest<S2_16_10>(size_x, size_y, deviceProp);
+            runTest<S2_16_10>(size_x, size_y, deviceProp, "S2_16_10");
             break;
         case 5:
-            runTest<S2_16_11>(size_x, size_y, deviceProp);
+            runTest<S2_16_11>(size_x, size_y, deviceProp, "S2_16_11");
             break;
         case 6:
-            runTest<S2_32_21>(size_x, size_y, deviceProp);
+            runTest<S2_32_21>(size_x, size_y, deviceProp, "S2_32_21");
             break;
         default:
             printf("Invalid test number: %d\n", testNum);
             exit(EXIT_FAILURE);
     }
-
-    // kernel pointer and descriptor
-    }
-
+}

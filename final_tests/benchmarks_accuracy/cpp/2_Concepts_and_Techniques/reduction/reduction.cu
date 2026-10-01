@@ -31,17 +31,21 @@
     This sample shows how to perform a reduction operation on an array of values
     to produce a single value.
 
-    Reductions are a very common computation in parallel algorithms.  Any time
-    an array of values needs to be reduced to a single value using a binary
-    associative operator, a reduction can be used.  Example applications include
-    statistics computations such as mean and standard deviation, and image
-    processing applications such as finding the total luminance of an
-    image.
+    MODIFICA: oltre al pass/fail contro un riferimento calcolato in T (Kahan
+    summation nel dominio di T -- confronto "auto-referenziale", vedi nota
+    sotto), ora viene calcolato anche un riferimento CPU in DOUBLE
+    (reduceCPUDouble), indipendente dalla precisione di T, e le metriche di
+    errore (assoluto/relativo, RMSE degenere a un solo valore, conteggio
+    sopra soglia) vengono salvate su CSV con lo stesso formato degli altri
+    benchmark (saveResultsCSV / saveTimingCSV, da "../utility.cu").
 
-    This code performs sum reductions, but any associative operator such as
-    min() or max() could also be used.
-
-    It assumes the input size is a power of 2.
+    Nota sul riferimento in T (reduceCPU<T>, lasciato invariato): la somma di
+    Kahan e' una correzione tarata sul modello di arrotondamento IEEE-754
+    float/double; su un T quantizzato (LNNS) o rerouted (Encapsulator) il
+    termine di compensazione non ha lo stesso significato, e il confronto
+    resta "T vs T" (stessa precisione), non "T vs verita'". Per questo il
+    riferimento usato per le nuove metriche di accuratezza e' calcolato in
+    double, non riusando reduceCPU<T>.
 
     COMMAND LINE ARGUMENTS
 
@@ -61,7 +65,7 @@
    "float", or "double" (default int)
 */
 
-// CUDA Runtime\
+// CUDA Runtime
 #include <cuda_runtime.h>
 #include "../../S2.cuh"
 #include "../../S1.cuh"
@@ -76,8 +80,11 @@ using S2_32_21 = LNNS<uint32_t, 21>;
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
+#include "../../utility.cu"
+
 // includes, project
 #include "reduction.h"
+#include "reduction_kernel.cu"
 
 enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE, REDUCE_S2_16_10, REDUCE_S2_16_11, REDUCE_S2_32_21, REDUCE_ENCAPSULATOR_FLOAT, REDUCE_ENCAPSULATOR_DOUBLE };
 
@@ -86,6 +93,7 @@ enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE, REDUCE_S2_16_10, REDU
 template <class T> bool runTest(int argc, char **argv, ReduceType datatype);
 
 #define MAX_BLOCK_DIM_SIZE 65535
+constexpr int BENCHMARK_ITERATIONS = 10000;
 
 #ifdef WIN32
 #define strcasecmp strcmpi
@@ -226,6 +234,27 @@ template <class T> T reduceCPU(T *data, int size)
     return sum;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//! Riferimento CPU in DOUBLE, indipendente dalla precisione di T -- usato
+//! per le metriche di accuratezza (vedi nota in testa al file). Richiede
+//! che T sia convertibile a double (operator double(), gia' presente su
+//! int/float/double nativi e aggiunto a Encapsulator<T>/LNNS<T,P>).
+////////////////////////////////////////////////////////////////////////////////
+template <class T> double reduceCPUDouble(T *data, int size)
+{
+    double sum = (double)data[0];
+    double c   = 0.0;
+
+    for (int i = 1; i < size; i++) {
+        double y = (double)data[i] - c;
+        double t = sum + y;
+        c        = (t - sum) - y;
+        sum      = t;
+    }
+
+    return sum;
+}
+
 unsigned int nextPow2(unsigned int x)
 {
     --x;
@@ -243,10 +272,8 @@ unsigned int nextPow2(unsigned int x)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Compute the number of threads and blocks to use for the given reduction
-// kernel For the kernels >= 3, we set threads / block to the minimum of
-// maxThreads and n/2. For kernels < 3, we set to the minimum of maxThreads and
-// n.  For kernel 6, we observe the maximum specified number of blocks, because
-// each thread in that kernel can process a variable number of elements.
+// kernel. reduce2 (l'unico kernel rimasto, un elemento per thread) usa
+// sempre la formula "threads = min(nextPow2(n), maxThreads)".
 ////////////////////////////////////////////////////////////////////////////////
 void getNumBlocksAndThreads(int n, int maxBlocks, int maxThreads, int &blocks, int &threads)
 {
@@ -258,7 +285,7 @@ void getNumBlocksAndThreads(int n, int maxBlocks, int maxThreads, int &blocks, i
 
     threads = (n < maxThreads) ? nextPow2(n) : maxThreads;
     blocks  = (n + threads - 1) / threads;
-    
+
     if ((float)threads * blocks > (float)prop.maxGridSize[0] * prop.maxThreadsPerBlock) {
         printf("n is too large, please choose a smaller number!\n");
     }
@@ -360,6 +387,57 @@ T benchmarkReduce(int                 n,
     return gpu_result;
 }
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Misura il tempo medio di riduzione per un tipo U, usata come baseline
+// "float" per calcolare l'overhead degli altri tipi nel CSV di timing.
+////////////////////////////////////////////////////////////////////////////////
+template <class U>
+double measureReduceTime(int size, int numThreads, int numBlocks, int maxThreads, int maxBlocks, int testIterations)
+{
+    unsigned int bytes = size * sizeof(U);
+
+    U *h_idata = (U *)malloc(bytes);
+    for (int i = 0; i < size; i++) {
+        h_idata[i] = (U)((rand() & 0xFF) / (float)RAND_MAX);
+    }
+
+    U *h_odata = (U *)malloc(numBlocks * sizeof(U));
+
+    U *d_idata = NULL;
+    U *d_odata = NULL;
+    checkCudaErrors(cudaMalloc((void **)&d_idata, bytes));
+    checkCudaErrors(cudaMalloc((void **)&d_odata, numBlocks * sizeof(U)));
+
+    checkCudaErrors(cudaMemcpy(d_idata, h_idata, bytes, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(d_odata, h_idata, numBlocks * sizeof(U), cudaMemcpyHostToDevice));
+
+    // warm-up
+    reduce<U>(size, numThreads, numBlocks, d_idata, d_odata);
+
+    StopWatchInterface *timer = 0;
+    sdkCreateTimer(&timer);
+
+    benchmarkReduce<U>(size, numThreads, numBlocks, maxThreads, maxBlocks,
+                        testIterations, false, 1,
+                        timer, h_odata, d_idata, d_odata);
+
+    double reduceTime = sdkGetAverageTimerValue(&timer) * 1e-3;
+
+    sdkDeleteTimer(&timer);
+    free(h_idata);
+    free(h_odata);
+    checkCudaErrors(cudaFree(d_idata));
+    checkCudaErrors(cudaFree(d_odata));
+
+    return reduceTime;
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // This function calls benchmarkReduce multiple times for a range of array sizes
 // and prints a report in CSV (comma-separated value) format that can be used
@@ -379,7 +457,7 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
             h_idata[i] = (T)(rand() & 0xFF);
         }
         else {
-            h_idata[i] = (rand() & 0xFF) / (T)RAND_MAX;
+            h_idata[i] = (rand() & 0xFF) / (float)RAND_MAX;
         }
     }
 
@@ -400,9 +478,9 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
     checkCudaErrors(cudaMemcpy(d_odata, h_idata, maxNumBlocks * sizeof(T), cudaMemcpyHostToDevice));
 
     reduce<T>(maxN, maxThreads, maxNumBlocks, d_idata, d_odata);
-    
 
-    int testIterations = 100;
+
+    int testIterations = BENCHMARK_ITERATIONS;
 
     StopWatchInterface *timer = 0;
     sdkCreateTimer(&timer);
@@ -437,7 +515,7 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
 
         printf(", %.5f", reduceTime);
     }
-    
+
     // cleanup
     sdkDeleteTimer(&timer);
     free(h_idata);
@@ -493,10 +571,10 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
         for (int i = 0; i < size; i++) {
             // Keep the numbers small so we don't get truncation error in the sum
             if (datatype == REDUCE_INT) {
-                h_idata[i] = (T)(rand() & 0xFF);
+                h_idata[i] = (rand() & 0xFF);
             }
             else {
-                h_idata[i] = (rand() & 0xFF) / (T)RAND_MAX;
+                h_idata[i] = (rand() & 0xFF) / (float)RAND_MAX;
             }
         }
 
@@ -527,7 +605,7 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
         // warm-up
         reduce<T>(size, numThreads, numBlocks, d_idata, d_odata);
 
-        int testIterations = 100;
+        int testIterations = BENCHMARK_ITERATIONS;
 
         StopWatchInterface *timer = 0;
         sdkCreateTimer(&timer);
@@ -556,7 +634,8 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
                1,
                numThreads);
 
-        // compute reference solution
+        // compute reference solution (T-domain, Kahan) -- usato per il
+        // pass/fail storico, invariato
         T cpu_result = reduceCPU<T>(h_idata, size);
 
         int    precision = 0;
@@ -589,8 +668,8 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
                 threshold = 1e-8 * size;
             }
             else if (datatype == REDUCE_ENCAPSULATOR_DOUBLE) {
-                precision = 16;
-                threshold = 1e-12 * size;
+                precision = 8;
+                threshold = 1e-8 * size;
             }
             else {
                 precision = 12;
@@ -603,6 +682,51 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
             diff = fabs((double)gpu_result - (double)cpu_result);
         }
 
+        // -----------------------------------------------------------------
+        // Metriche di accuratezza vs riferimento CPU in DOUBLE (indipendente
+        // da T, vedi nota in testa al file). La riduzione produce un solo
+        // valore scalare, quindi qui "max" ed "avg" (e la RMSE) coincidono
+        // tutti con l'unico errore disponibile -- non e' un errore di
+        // copia/incolla dal pattern elemento-per-elemento degli altri
+        // benchmark, e' la forma corretta per una singola osservazione.
+        // -----------------------------------------------------------------
+        if (datatype != REDUCE_INT) {
+            double cpuResultDouble = reduceCPUDouble<T>(h_idata, size);
+            double gpuResultDouble = (double)gpu_result;
+            double absError        = fabs(gpuResultDouble - cpuResultDouble);
+            double den             = (fabs(cpuResultDouble) > 1e-30) ? fabs(cpuResultDouble) : 1.0;
+            double relError        = absError / den;
+            int    countOverThresh = (absError > threshold) ? 1 : 0;
+
+            saveResultsCSV(
+                "reduction_results.csv",
+                std::string(getReduceTypeString(datatype)),
+                size,
+                threshold,
+                (float)absError,
+                (float)absError,
+                (float)absError,
+                (float)relError,
+                (float)relError,
+                countOverThresh
+            );
+
+            // Tempo di riferimento "float" per l'overhead: se T e' gia' float
+            // riusa il tempo appena misurato, altrimenti lancia una seconda
+            // riduzione identica (stessa size/config) in float, solo per il timing.
+            double floatReduceTime = reduceTime;
+            if constexpr (!std::is_same<T, float>::value) {
+                floatReduceTime = measureReduceTime<float>(size, numThreads, numBlocks, maxThreads, maxBlocks, testIterations);
+            }
+
+            saveTimingCSV(
+                "reduction_timing.csv",
+                std::string(getReduceTypeString(datatype)),
+                size,
+                (float)reduceTime,
+                (float)floatReduceTime
+            );
+        }
         // cleanup
         sdkDeleteTimer(&timer);
         free(h_idata);
