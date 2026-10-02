@@ -28,9 +28,12 @@
 /**
  * Matrix-Vector multiplication: y = A * x.
  *
- * This sample is a very basic sample that implements element by element
- * matrix-vector multiplication. It is the same as the sample illustrating Chapter 2
- * of the programming guide with some additions like error checking.
+ * Optimized version: one block per output row, threads within the block
+ * cooperatively stride over the columns of that row (coalesced reads of A
+ * and x across the warp/block) and reduce their partial sums in shared
+ * memory. This replaces the original "one thread = one row, serial loop"
+ * layout, which launched too few blocks to fill the GPU and produced a
+ * fully strided (non-coalesced) access pattern on A across the warp.
  */
 
 #include <stdio.h>
@@ -57,14 +60,34 @@ using EncDb = Encapsulator<double>;
 template <typename T>
 __global__ void matVecMul(const T *A, const T *x, T *y, int rows, int cols)
 {
-    int row = blockDim.x * blockIdx.x + threadIdx.x;
+    // Shared memory is declared as raw bytes and reinterpreted as T*:
+    // declaring "extern __shared__ T sdata[]" directly would clash across
+    // different template instantiations of this kernel (they'd all share
+    // the same linker symbol despite different T), so we go through an
+    // untyped byte array instead.
+    extern __shared__ unsigned char smem_raw[];
+    T *sdata = reinterpret_cast<T *>(smem_raw);
 
-    if (row < rows) {
-        T sum = 0.0f;
-        for (int col = 0; col < cols; col++) {
-            sum += A[row * cols + col] * x[col];
+    int row = blockIdx.x;
+    if (row >= rows) return;
+
+    T sum = 0.0f;
+    for (int col = threadIdx.x; col < cols; col += blockDim.x) {
+        sum += A[row * cols + col] * x[col];
+    }
+
+    sdata[threadIdx.x] = sum;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (threadIdx.x < stride) {
+            sdata[threadIdx.x] += sdata[threadIdx.x + stride];
         }
-        y[row] = sum;
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        y[row] = sdata[0];
     }
 }
 
@@ -151,11 +174,18 @@ void runTest(){
         exit(EXIT_FAILURE);
     }
 
-    // Launch the Matrix-Vector Multiplication CUDA Kernel
+    // Launch the Matrix-Vector Multiplication CUDA Kernel.
+    // One block per output row; threads in the block stride over the
+    // columns of that row (coalesced A/x reads) and reduce in shared
+    // memory. Grid size now scales with "rows" directly (5000 blocks
+    // instead of 20), giving the GPU enough independent blocks to reach
+    // good occupancy regardless of T.
     int threadsPerBlock = 256;
-    int blocksPerGrid   = (rows + threadsPerBlock - 1) / threadsPerBlock;
-    printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid, threadsPerBlock);
-    matVecMul<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, rows, cols);
+    int blocksPerGrid   = rows;
+    size_t sharedMemBytes = threadsPerBlock * sizeof(T);
+    printf("CUDA kernel launch with %d blocks of %d threads (%zu bytes shared mem/block)\n",
+           blocksPerGrid, threadsPerBlock, sharedMemBytes);
+    matVecMul<<<blocksPerGrid, threadsPerBlock, sharedMemBytes>>>(d_A, d_B, d_C, rows, cols);
     err = cudaGetLastError();
 
     if (err != cudaSuccess) {
