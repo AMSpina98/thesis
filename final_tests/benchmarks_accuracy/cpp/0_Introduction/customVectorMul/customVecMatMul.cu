@@ -48,16 +48,22 @@
  * number of elements numElements.
  */
 
+#include "../../S1.cuh"
 #include "../../S2.cuh"
 
-using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_21 with 21 fractional bits
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+using EncFp = Encapsulator<float>;
+using EncDb = Encapsulator<double>;
 
-__global__ void matVecMul(const LNNS16_21 *A, const LNNS16_21 *x, LNNS16_21 *y, int rows, int cols)
+template <typename T>
+__global__ void matVecMul(const T *A, const T *x, T *y, int rows, int cols)
 {
     int row = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (row < rows) {
-        LNNS16_21 sum = 0.0f;
+        T sum = 0.0f;
         for (int col = 0; col < cols; col++) {
             sum += A[row * cols + col] * x[col];
         }
@@ -82,34 +88,37 @@ __global__ void matVecMulFloat(const float *A, const float *x, float *y, int row
 /**
  * Host main routine
  */
-int main(void)
-{
-    // Error code to check return values for CUDA calls
+
+template <typename T>
+void runTest(const std::string& type){
+// Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
 
     // Print the vector length to be used, and compute its size
     int    rows = 4000;
     int    cols = 4000;
-    size_t sizeA        = rows * cols * sizeof(LNNS16_21);
+
+
+    size_t sizeA        = rows * cols * sizeof(T);
     size_t sizeA_float  = rows * cols * sizeof(float);
-    size_t sizeB        = cols * sizeof(LNNS16_21);
+    size_t sizeB        = cols * sizeof(T);
     size_t sizeB_float  = cols * sizeof(float);
-    size_t sizeC        = rows * sizeof(LNNS16_21);
+    size_t sizeC        = rows * sizeof(T);
     size_t sizeC_float  = rows * sizeof(float);
     printf("[Matrix-Vector multiplication of %d x %d elements]\n", rows, cols);
 
     // Allocate the host input vector A
-    LNNS16_21 *h_A = (LNNS16_21 *)malloc(sizeA);
+    T *h_A = (T *)malloc(sizeA);
 
     float *h_A_float = (float *)malloc(sizeA_float);
 
     // Allocate the host input vector B
-    LNNS16_21 *h_B = (LNNS16_21 *)malloc(sizeB);
+    T *h_B = (T *)malloc(sizeB);
 
     float *h_B_float = (float *)malloc(sizeB_float);
 
     // Allocate the host output vector C
-    LNNS16_21 *h_C = (LNNS16_21 *)malloc(sizeC);
+    T *h_C = (T *)malloc(sizeC);
 
     float *h_C_float = (float *)malloc(sizeC_float);
 
@@ -132,7 +141,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_21 *d_A = NULL;
+    T *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, sizeA);
 
     if (err != cudaSuccess) {
@@ -149,7 +158,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_21 *d_B = NULL;
+    T *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, sizeB);
 
     if (err != cudaSuccess) {
@@ -166,7 +175,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_21 *d_C = NULL;
+    T *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, sizeC);
 
     if (err != cudaSuccess) {
@@ -317,7 +326,7 @@ int main(void)
 
     for(int i = 0; i < rows; ++i) {
         for(int j = 0; j < cols; ++j) {
-            float errorA = fabsf(h_A[i * cols + j].toFloat() - h_A_float[i * cols + j]);
+            float errorA = fabsf((float)h_A[i * cols + j] - h_A_float[i * cols + j]);
             float den = fabsf(h_A_float[i * cols + j]) != 0.0f ? fabsf(h_A_float[i * cols + j]) : 1.0f;
             float relErrorA = fabsf(errorA / den);
             if(relErrorA > maxRelErrorA) maxRelErrorA = relErrorA;
@@ -334,7 +343,7 @@ int main(void)
     avgRelErrorA /= elementsA;
     
     for(int i = 0; i < cols; ++i) {
-        float errorB = fabsf(h_B[i].toFloat() - h_B_float[i]);
+        float errorB = fabsf((float)h_B[i] - h_B_float[i]);
         float den = fabsf(h_B_float[i]) != 0.0f ? fabsf(h_B_float[i]) : 1.0f;
         float relErrorB = fabsf(errorB / den);
         if(relErrorB > maxRelErrorB) maxRelErrorB = relErrorB;
@@ -350,7 +359,7 @@ int main(void)
     avgRelErrorB /= elementsB;
     
     for(int i = 0; i < rows; ++i) {
-        float errorC = fabsf(h_C[i].toFloat() - h_C_float[i]);
+        float errorC = fabsf((float)h_C[i] - h_C_float[i]);
         float den = fabsf(h_C_float[i]) != 0.0f ? fabsf(h_C_float[i]) : 1.0f;
         float relErrorC = fabsf(errorC / den);
         if(relErrorC > maxRelErrorC) maxRelErrorC = relErrorC;
@@ -366,7 +375,7 @@ int main(void)
 
     saveResultsCSV(
         "vetmatmul_A_results.csv",
-        "LNNS16_21",
+        type,
         elementsA,
         threshold,
         maxAbsErrorA,
@@ -379,7 +388,7 @@ int main(void)
 
     saveResultsCSV(
         "vetmatmul_B_results.csv",
-        "LNNS16_21",
+        type,
         elementsB,
         threshold,
         maxAbsErrorB,
@@ -392,7 +401,7 @@ int main(void)
 
     saveResultsCSV(
         "vetmatmul_C_results.csv",
-        "LNNS16_21",
+        type,
         elementsC,
         threshold,
         maxAbsErrorC,
@@ -406,7 +415,7 @@ int main(void)
     
     saveTimingCSV(
         "vetmatmul_timing.csv",
-        "LNNS16_21",
+        type,
         elementsC,
         elapsed,
         elapsed_float
@@ -467,5 +476,30 @@ int main(void)
     free(h_C_float);
 
     printf("Done\n");
+}
+
+
+int main(int argc, char **argv)
+{
+    int testNum = 0;
+    if (checkCmdLineFlag(argc, (const char **)argv, "testNum")) {
+        testNum = getCmdLineArgumentInt(argc, (const char **)argv, "testNum");
+    }
+
+    switch(testNum){
+        case 0: runTest<float>("float"); break;
+        case 1: runTest<double>("double"); break;
+        case 2: runTest<EncFp>("EncFp"); break;
+        case 3: runTest<EncDb>("EncDb"); break;
+        case 4: runTest<S2_16_10>("S2_16_10"); break;
+        case 5: runTest<S2_16_11>("S2_16_11"); break;
+        case 6: runTest<S2_32_21>("S2_32_21"); break;
+        default:
+            printf("Invalid test number: %d\n", testNum);
+            exit(EXIT_FAILURE);
+    }
+
+
     return 0;
+    
 }

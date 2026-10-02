@@ -46,6 +46,7 @@
 // CUDA runtime
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
+#include "./../../S1.cuh"
 #include "./../../S2.cuh"
 #include "../../utility.cu"
 
@@ -53,13 +54,19 @@
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
-using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_21 with 21 fractional bits
+
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+using EncFp = Encapsulator<float>;
+using EncDb = Encapsulator<double>;
 
 /**
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
  * wA is A's width and wB is B's width
  */
-template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 *A, LNNS16_21 *B, int wA, int wB)
+
+template <int BLOCK_SIZE, typename T> __global__ void MatrixMulCUDA(T *C, T *A, T *B, int wA, int wB)
 {
     // Block index
     int bx = blockIdx.x;
@@ -86,18 +93,18 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
-    LNNS16_21 Csub = 0.0f;
+    T Csub = 0.0f;
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
     for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep) {
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
-        __shared__ LNNS16_21 As[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ T As[BLOCK_SIZE][BLOCK_SIZE];
 
         // Declaration of the shared memory array Bs used to
         // store the sub-matrix of B
-        __shared__ LNNS16_21 Bs[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ T Bs[BLOCK_SIZE][BLOCK_SIZE];
 
         // Load the matrices from device memory
         // to shared memory; each thread loads
@@ -129,7 +136,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 
     C[c + wB * ty + tx] = Csub;
 }
 
-void ConstantInit(LNNS16_21 *data, int size, LNNS16_21 val)
+template <typename T> void ConstantInit(T *data, int size, T val)
 {
     for (int i = 0; i < size; ++i) {
         data[i] = val;
@@ -216,27 +223,28 @@ void OriginalConstantInit(float *data, int size, float val)
 /**
  * Run a simple test of matrix multiplication using CUDA
  */
-int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, const dim3 &dimsB)
+template <typename T>
+int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, const dim3 &dimsB, const std::string& type)
 {
     // Allocate host memory for matrices A and B
     unsigned int size_A     = dimsA.x * dimsA.y;
-    unsigned int mem_size_A = sizeof(LNNS16_21) * size_A;
+    unsigned int mem_size_A = sizeof(T) * size_A;
     unsigned int mem_size_A_float = sizeof(float) * size_A;
-    LNNS16_21       *h_A;
+    T       *h_A;
     float *h_A_float;
     checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
     checkCudaErrors(cudaMallocHost(&h_A_float, mem_size_A_float));
     unsigned int size_B     = dimsB.x * dimsB.y;
-    unsigned int mem_size_B = sizeof(LNNS16_21) * size_B;
+    unsigned int mem_size_B = sizeof(T) * size_B;
     unsigned int mem_size_B_float = sizeof(float) * size_B;
-    LNNS16_21       *h_B;
+    T       *h_B;
     float *h_B_float;
     checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
     checkCudaErrors(cudaMallocHost(&h_B_float, mem_size_B_float));
     cudaStream_t stream;
 
     // Initialize host memory
-    const LNNS16_21 valB = 0.01f;
+    const T valB = 0.01f;
     const float valB_float = 0.01f;
     ConstantInit(h_A, size_A, 1.0f);
     ConstantInit(h_B, size_B, valB);
@@ -244,15 +252,15 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     OriginalConstantInit(h_B_float, size_B, valB_float);
 
     // Allocate device memory
-    LNNS16_21 *d_A, *d_B, *d_C;
+    T *d_A, *d_B, *d_C;
     float *d_A_float, *d_B_float, *d_C_float;
 
     // Allocate host matrix C
     dim3         dimsC(dimsB.x, dimsA.y, 1);
     unsigned int size_C     = dimsC.x * dimsC.y;
-    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(LNNS16_21);
+    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(T);
     unsigned int mem_size_C_float = dimsC.x * dimsC.y * sizeof(float);
-    LNNS16_21       *h_C;
+    T       *h_C;
     float *h_C_float;
     checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
     checkCudaErrors(cudaMallocHost(&h_C_float, mem_size_C_float));
@@ -399,7 +407,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     float RSME_C = 0.0f;
 
     for(int i = 0; i < elementsA; ++i) {
-        float errorA = fabsf(h_A[i].toFloat() - h_A_float[i]);
+        float errorA = fabsf((float)h_A[i] - h_A_float[i]);
         float den = fabsf(h_A_float[i]) != 0.0f ? fabsf(h_A_float[i]) : 1.0f;
         float relErrorA = fabsf(errorA / den);
         if(relErrorA > maxRelErrorA) maxRelErrorA = relErrorA;
@@ -415,7 +423,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     avgRelErrorA /= elementsA;
     
     for(int i = 0; i < elementsB; ++i) {
-        float errorB = fabsf(h_B[i].toFloat() - h_B_float[i]);
+        float errorB = fabsf((float)h_B[i] - h_B_float[i]);
         float den = fabsf(h_B_float[i]) != 0.0f ? fabsf(h_B_float[i]) : 1.0f;
         float relErrorB = fabsf(errorB / den);
         if(relErrorB > maxRelErrorB) maxRelErrorB = relErrorB;
@@ -431,7 +439,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     avgRelErrorB /= elementsB;
     
     for(int i = 0; i < elementsC; ++i) {
-        float errorC = fabsf(h_C[i].toFloat() - h_C_float[i]);
+        float errorC = fabsf((float)h_C[i] - h_C_float[i]);
         float den = fabsf(h_C_float[i]) != 0.0f ? fabsf(h_C_float[i]) : 1.0f;
         float relErrorC = fabsf(errorC / den);
         if(relErrorC > maxRelErrorC) maxRelErrorC = relErrorC;
@@ -447,7 +455,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 
     saveResultsCSV(
         "matmul_A_results.csv",
-        "LNNS16_21",
+        type,
         elementsA,
         threshold,
         maxAbsErrorA,
@@ -460,7 +468,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 
     saveResultsCSV(
         "matmul_B_results.csv",
-        "LNNS16_21",
+        type,
         elementsB,
         threshold,
         maxAbsErrorB,
@@ -473,7 +481,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 
     saveResultsCSV(
         "matmul_C_results.csv",
-        "LNNS16_21",
+        type,
         elementsC,
         threshold,
         maxAbsErrorC,
@@ -486,8 +494,8 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 
     saveTimingCSV(
         "matmul_timing.csv",
-        "LNNS16_21",
-        nIter,
+        type,
+        elementsC,
         elapsed,
         elapsed_float
     );
@@ -574,9 +582,62 @@ int main(int argc, char **argv)
 
     printf("MatrixA(%d,%d), MatrixB(%d,%d)\n", dimsA.x, dimsA.y, dimsB.x, dimsB.y);
 
-    checkCudaErrors(cudaProfilerStart());
-    int matrix_result = MatrixMultiply(argc, argv, block_size, dimsA, dimsB);
-    checkCudaErrors(cudaProfilerStop());
+
+    int testNum = 0;
+    if (checkCmdLineFlag(argc, (const char **)argv, "testNum")) {
+        testNum = getCmdLineArgumentInt(argc, (const char **)argv, "testNum");
+    }
+    int matrix_result = 0;
+    switch(testNum){
+        case 0: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<float>(argc, argv, block_size, dimsA, dimsB, "float");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 1:{
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<double>(argc, argv, block_size, dimsA, dimsB, "double");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 2: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<EncFp>(argc, argv, block_size, dimsA, dimsB, "EncFp");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 3: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<EncDb>(argc, argv, block_size, dimsA, dimsB, "EncDb");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 4: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<S2_16_10>(argc, argv, block_size, dimsA, dimsB, "S2_16_10");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 5: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<S2_16_11>(argc, argv, block_size, dimsA, dimsB, "S2_16_11");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 6: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<S2_32_21>(argc, argv, block_size, dimsA, dimsB, "S2_32_21");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        default:
+            printf("Invalid test number: %d\n", testNum);
+            exit(EXIT_FAILURE);
+    }
+
+
+
 
     exit(matrix_result);
 }

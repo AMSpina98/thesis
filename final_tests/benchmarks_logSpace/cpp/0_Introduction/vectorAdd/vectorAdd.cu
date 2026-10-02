@@ -45,40 +45,47 @@
  * number of elements numElements.
  */
 
+ #include "../../S1.cuh"
  #include "../../S2.cuh"
 
- using LNNS16_10 = LNNS<uint16_t, 10>; // 16-bit LNNS16_1016 with 10 fractional bits
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+using EncFp = Encapsulator<float>;
+using EncDb = Encapsulator<double>;
 
-__global__ void vectorAdd(const LNNS16_10 *A, const LNNS16_10 *B, LNNS16_10 *C, int numElements)
+template <typename T>
+__global__ void vectorAdd(const T *A, const T *B, T *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i < numElements) {
-        C[i] = A[i] + B[i] + LNNS16_10(0.0f);
+        C[i] = A[i] + B[i] + T(0.0f);
     }
 }
 
-/**
- * Host main routine
- */
-int main(void)
-{
+
+
+
+template<typename T>
+void runTest(int argc, char **argv) {
+
     // Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
 
     // Print the vector length to be used, and compute its size
     int    numElements = 50000;
-    size_t size        = numElements * sizeof(LNNS16_10);
+    size_t size        = numElements * sizeof(T);
     printf("[Vector addition of %d elements]\n", numElements);
 
     // Allocate the host input vector A
-    LNNS16_10 *h_A = (LNNS16_10 *)malloc(size);
+    T *h_A = (T *)malloc(size);
 
     // Allocate the host input vector B
-    LNNS16_10 *h_B = (LNNS16_10 *)malloc(size);
+    T *h_B = (T *)malloc(size);
 
     // Allocate the host output vector C
-    LNNS16_10 *h_C = (LNNS16_10 *)malloc(size);
+    T *h_C = (T *)malloc(size);
 
     // Verify that allocations succeeded
     if (h_A == NULL || h_B == NULL || h_C == NULL) {
@@ -93,7 +100,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_10 *d_A = NULL;
+    T *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, size);
 
     if (err != cudaSuccess) {
@@ -102,7 +109,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_10 *d_B = NULL;
+    T *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, size);
 
     if (err != cudaSuccess) {
@@ -111,7 +118,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_10 *d_C = NULL;
+    T *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, size);
 
     if (err != cudaSuccess) {
@@ -161,7 +168,7 @@ int main(void)
 
     // Verify that the result vector is correct
     for (int i = 0; i < numElements; ++i) {
-        if (fabs((h_A[i] + h_B[i] - h_C[i]).toFloat()) > 1e-5) {
+        if (fabs(((float)h_A[i] + (float)h_B[i] - (float)h_C[i])) > 1e-5) {
             fprintf(stderr, "Result verification failed at element %d!\n", i);
             exit(EXIT_FAILURE);
         }
@@ -197,5 +204,34 @@ int main(void)
     free(h_C);
 
     printf("Done\n");
-    return 0;
+    
+
+}
+
+
+
+
+/**
+ * Host main routine
+ */
+int main(int argc, char **argv)
+{
+        int testNum = 0;
+        if (checkCmdLineFlag(argc, (const char **)argv, "testNum")) {
+            testNum = getCmdLineArgumentInt(argc, (const char **)argv, "testNum");
+        }
+
+        switch(testNum){
+            case 0: runTest<float>(argc, argv); break;
+            case 1: runTest<double>(argc, argv); break;
+            case 2: runTest<EncFp>(argc, argv); break;
+            case 3: runTest<EncDb>(argc, argv); break;
+            case 4: runTest<S2_16_10>(argc, argv); break;
+            case 5: runTest<S2_16_11>(argc, argv); break;
+            case 6: runTest<S2_32_21>(argc, argv); break;
+            default:
+                printf("Invalid test number: %d\n", testNum);
+                exit(EXIT_FAILURE);
+        }
+        return 0;
 }

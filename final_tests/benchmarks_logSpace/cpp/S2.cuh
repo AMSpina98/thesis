@@ -139,7 +139,7 @@ struct LNNS {
     static constexpr float SCALE_FACTOR = static_cast<float>(StorageType(1) << FRACTIONAL_BITS);
     static constexpr StorageType SIGN_MASK = StorageType(1) << MANTISSA_BITS;
     static constexpr SignedStorageType  MAX_MANTISSA = (1 << (MANTISSA_BITS - 1)) - 1;
-    static constexpr SignedStorageType  MIN_MANTISSA = -(1 << (MANTISSA_BITS - 1));
+    static constexpr SignedStorageType  MIN_MANTISSA = -((1 << (MANTISSA_BITS - 1)) - 1);
     static constexpr StorageType MANTISSA_MASK = static_cast<StorageType>((StorageType(1) << MANTISSA_BITS) - 1);
     // Define reserved values
     static constexpr StorageType LOG_ZERO = MANTISSA_SIGN_MASK;
@@ -293,8 +293,8 @@ struct LNNS {
 
     __host__ __device__ LNNS operator-(const LNNS& other) const {
         if(value == LOG_NAN || other.value == LOG_NAN) return LNNS::raw(static_cast<StorageType>(LOG_NAN));
-        if(value == LOG_ZERO) return LNNS::raw(SIGN_MASK ^ other.value);
         if(other.value == LOG_ZERO) return *this;
+        if(value == LOG_ZERO) return LNNS::raw(SIGN_MASK ^ other.value);
         SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
         SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
         StorageType signA = value & SIGN_MASK;
@@ -319,11 +319,11 @@ struct LNNS {
             value = LOG_NAN;
             return *this;
         }
+        if(other.value == LOG_ZERO) return *this;
         if(value == LOG_ZERO) {
             value = SIGN_MASK ^ other.value;
             return *this;
         }
-        if(other.value == LOG_ZERO) return *this;
         SignedStorageType mantissaA = ((value & MANTISSA_SIGN_MASK)<<1) | (value & MANTISSA_MASK);
         SignedStorageType mantissaB = ((other.value & MANTISSA_SIGN_MASK)<<1) | (other.value & MANTISSA_MASK);
         StorageType signA = value & SIGN_MASK;
@@ -520,10 +520,16 @@ struct LNNS {
         float result = LNNSMath::Exp(y);
         return static_cast<unsigned int>(result);
     }
-    operator float() const { return toFloat(); }
-    operator double() const { return toDouble(); }
-    operator int() const { return toInt(); }
-    operator unsigned int() const { return toUInt(); }
 
+    template <typename U = StorageType, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
+    __host__ __device__ operator float() const { return toFloat(); }
 
+    template <typename U = StorageType, typename = typename std::enable_if<!std::is_same<U, double>::value>::type>
+    __host__ __device__ operator double() const { return toDouble(); }
+
+    template <typename U = StorageType, typename = typename std::enable_if<!std::is_same<U, int>::value>::type>
+    __host__ __device__ operator int() const { return toInt(); }
+
+    template <typename U = StorageType, typename = typename std::enable_if<!std::is_same<U, unsigned int>::value>::type>
+    __host__ __device__ operator unsigned int() const { return toUInt(); }
 };

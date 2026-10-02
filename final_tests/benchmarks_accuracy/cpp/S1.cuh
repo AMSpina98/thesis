@@ -130,7 +130,6 @@ struct Encapsulator {
 
     T value;
 
-    __host__ __device__
     Encapsulator() = default;
 
     __host__ __device__

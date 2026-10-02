@@ -316,7 +316,7 @@ T benchmarkReduce(int                 n,
                   int                 testIterations,
                   bool                cpuFinalReduction,
                   int                 cpuFinalThreshold,
-                  StopWatchInterface *timer,
+                  float              &avgTimeMs,
                   T                  *h_odata,
                   T                  *d_idata,
                   T                  *d_odata)
@@ -327,67 +327,66 @@ T benchmarkReduce(int                 n,
     T *d_intermediateSums;
     checkCudaErrors(cudaMalloc((void **)&d_intermediateSums, sizeof(T) * numBlocks));
 
+    cudaEvent_t startE, stopE;
+    cudaEventCreate(&startE);
+    cudaEventCreate(&stopE);
+
+    double totalTimeMs = 0.0;
+
     for (int i = 0; i < testIterations; ++i) {
         gpu_result = 0;
 
         cudaDeviceSynchronize();
-        sdkStartTimer(&timer);
+        cudaEventRecord(startE);
 
         // execute the kernel
         reduce<T>(n, numThreads, numBlocks, d_idata, d_odata);
-
-        // check if kernel execution generated an error
         getLastCudaError("Kernel execution failed");
 
         if (cpuFinalReduction) {
-            // sum partial sums from each block on CPU
-            // copy result from device to host
             checkCudaErrors(cudaMemcpy(h_odata, d_odata, numBlocks * sizeof(T), cudaMemcpyDeviceToHost));
-
-            for (int i = 0; i < numBlocks; i++) {
-                gpu_result += h_odata[i];
+            for (int j = 0; j < numBlocks; j++) {
+                gpu_result += h_odata[j];
             }
-
             needReadBack = false;
         }
         else {
-            // sum partial block sums on GPU
-            int s      = numBlocks;
-
+            int s = numBlocks;
             while (s > cpuFinalThreshold) {
                 int threads = 0, blocks = 0;
                 getNumBlocksAndThreads(s, maxBlocks, maxThreads, blocks, threads);
                 checkCudaErrors(cudaMemcpy(d_intermediateSums, d_odata, s * sizeof(T), cudaMemcpyDeviceToDevice));
                 reduce<T>(s, threads, blocks, d_intermediateSums, d_odata);
-
                 s = (s + threads - 1) / threads;
             }
-
             if (s > 1) {
-                // copy result from device to host
                 checkCudaErrors(cudaMemcpy(h_odata, d_odata, s * sizeof(T), cudaMemcpyDeviceToHost));
-
-                for (int i = 0; i < s; i++) {
-                    gpu_result += h_odata[i];
+                for (int j = 0; j < s; j++) {
+                    gpu_result += h_odata[j];
                 }
-
                 needReadBack = false;
             }
         }
 
-        cudaDeviceSynchronize();
-        sdkStopTimer(&timer);
+        cudaEventRecord(stopE);
+        cudaEventSynchronize(stopE);
+
+        float iterMs = 0.0f;
+        cudaEventElapsedTime(&iterMs, startE, stopE);
+        totalTimeMs += iterMs;
     }
 
+    avgTimeMs = static_cast<float>(totalTimeMs / testIterations);
+
     if (needReadBack) {
-        // copy final sum from device to host
         checkCudaErrors(cudaMemcpy(&gpu_result, d_odata, sizeof(T), cudaMemcpyDeviceToHost));
     }
+
+    cudaEventDestroy(startE);
+    cudaEventDestroy(stopE);
     checkCudaErrors(cudaFree(d_intermediateSums));
     return gpu_result;
 }
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -417,25 +416,18 @@ double measureReduceTime(int size, int numThreads, int numBlocks, int maxThreads
     // warm-up
     reduce<U>(size, numThreads, numBlocks, d_idata, d_odata);
 
-    StopWatchInterface *timer = 0;
-    sdkCreateTimer(&timer);
-
+    float avgTimeMs = 0.0f;
     benchmarkReduce<U>(size, numThreads, numBlocks, maxThreads, maxBlocks,
                         testIterations, false, 1,
-                        timer, h_odata, d_idata, d_odata);
+                        avgTimeMs, h_odata, d_idata, d_odata);
 
-    double reduceTime = sdkGetAverageTimerValue(&timer) * 1e-3;
-
-    sdkDeleteTimer(&timer);
     free(h_idata);
     free(h_odata);
     checkCudaErrors(cudaFree(d_idata));
     checkCudaErrors(cudaFree(d_odata));
 
-    return reduceTime;
+    return avgTimeMs * 1e-3;  // secondi, come prima
 }
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -482,12 +474,10 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
 
     int testIterations = BENCHMARK_ITERATIONS;
 
-    StopWatchInterface *timer = 0;
-    sdkCreateTimer(&timer);
+    float avgTimeMs = 0.0f;
 
 
     for (int i = minN; i <= maxN; i *= 2) {
-        sdkResetTimer(&timer);
         int numBlocks  = 0;
         int numThreads = 0;
         getNumBlocksAndThreads(i, maxBlocks, maxThreads, numBlocks, numThreads);
@@ -503,11 +493,11 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
                             testIterations,
                             false,
                             1,
-                            timer,
+                            avgTimeMs,
                             h_odata,
                             d_idata,
                             d_odata);
-            reduceTime = sdkGetAverageTimerValue(&timer);
+            reduceTime = avgTimeMs * 1e-3;
         }
         else {
             reduceTime = -1.0;
@@ -517,7 +507,6 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
     }
 
     // cleanup
-    sdkDeleteTimer(&timer);
     free(h_idata);
     free(h_odata);
 
@@ -607,25 +596,14 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
 
         int testIterations = BENCHMARK_ITERATIONS;
 
-        StopWatchInterface *timer = 0;
-        sdkCreateTimer(&timer);
+        float avgTimeMs = 0.0f;
 
-        T gpu_result = 0;
+        T gpu_result = benchmarkReduce<T>(size, numThreads, numBlocks, maxThreads, maxBlocks,
+                                        testIterations, cpuFinalReduction, cpuFinalThreshold,
+                                        avgTimeMs, h_odata, d_idata, d_odata);
 
-        gpu_result = benchmarkReduce<T>(size,
-                                        numThreads,
-                                        numBlocks,
-                                        maxThreads,
-                                        maxBlocks,
-                                        testIterations,
-                                        cpuFinalReduction,
-                                        cpuFinalThreshold,
-                                        timer,
-                                        h_odata,
-                                        d_idata,
-                                        d_odata);
+        double reduceTime = avgTimeMs * 1e-3;
 
-        double reduceTime = sdkGetAverageTimerValue(&timer) * 1e-3;
         printf("Reduction, Throughput = %.4f GB/s, Time = %.5f s, Size = %u Elements, "
                "NumDevsUsed = %d, Workgroup = %u\n",
                1.0e-9 * ((double)bytes) / reduceTime,
@@ -728,7 +706,6 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
             );
         }
         // cleanup
-        sdkDeleteTimer(&timer);
         free(h_idata);
         free(h_odata);
 

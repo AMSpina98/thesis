@@ -61,7 +61,7 @@
    "float", or "double" (default int)
 */
 
-// CUDA Runtime\
+// CUDA Runtime
 #include <cuda_runtime.h>
 #include "../../S2.cuh"
 #include "../../S1.cuh"
@@ -376,10 +376,10 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
     for (int i = 0; i < maxN; i++) {
         // Keep the numbers small so we don't get truncation error in the sum
         if (datatype == REDUCE_INT) {
-            h_idata[i] = (T)(rand() & 0xFF);
+            h_idata[i] = (rand() & 0xFF);
         }
         else {
-            h_idata[i] = (rand() & 0xFF) / (T)RAND_MAX;
+            h_idata[i] = (rand() & 0xFF) / (float)RAND_MAX;
         }
     }
 
@@ -402,7 +402,7 @@ template <class T> void shmoo(int minN, int maxN, int maxThreads, int maxBlocks,
     reduce<T>(maxN, maxThreads, maxNumBlocks, d_idata, d_odata);
     
 
-    int testIterations = 100;
+    int testIterations = 10;
 
     StopWatchInterface *timer = 0;
     sdkCreateTimer(&timer);
@@ -493,10 +493,10 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
         for (int i = 0; i < size; i++) {
             // Keep the numbers small so we don't get truncation error in the sum
             if (datatype == REDUCE_INT) {
-                h_idata[i] = (T)(rand() & 0xFF);
+                h_idata[i] = (rand() & 0xFF);
             }
             else {
-                h_idata[i] = (rand() & 0xFF) / (T)RAND_MAX;
+                h_idata[i] = (rand() & 0xFF) / (float)RAND_MAX;
             }
         }
 
@@ -527,7 +527,7 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
         // warm-up
         reduce<T>(size, numThreads, numBlocks, d_idata, d_odata);
 
-        int testIterations = 100;
+        int testIterations = 10;
 
         StopWatchInterface *timer = 0;
         sdkCreateTimer(&timer);

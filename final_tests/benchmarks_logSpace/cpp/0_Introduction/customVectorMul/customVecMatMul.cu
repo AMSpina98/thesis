@@ -45,16 +45,22 @@
  * and the vectors x and y have the same number of elements.
  */
 
+#include "../../S1.cuh"
 #include "../../S2.cuh"
 
-using LNNS16_11 = LNNS<uint32_t, 21>; // 16-bit LNNS16_11 with 11 fractional bits
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+using EncFp = Encapsulator<float>;
+using EncDb = Encapsulator<double>;
 
-__global__ void matVecMul(const LNNS16_11 *A, const LNNS16_11 *x, LNNS16_11 *y, int rows, int cols)
+template <typename T>
+__global__ void matVecMul(const T *A, const T *x, T *y, int rows, int cols)
 {
     int row = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (row < rows) {
-        LNNS16_11 sum = 0.0f;
+        T sum = 0.0f;
         for (int col = 0; col < cols; col++) {
             sum += A[row * cols + col] * x[col];
         }
@@ -62,30 +68,29 @@ __global__ void matVecMul(const LNNS16_11 *A, const LNNS16_11 *x, LNNS16_11 *y, 
     }
 }
 
-/**
- * Host main routine
- */
-int main(void)
-{
+
+template <typename T>
+void runTest(){
+
     // Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
 
     // Print the vector length to be used, and compute its size
     int    rows = 5000;
     int    cols = 5000;
-    size_t sizeA        = rows * cols * sizeof(LNNS16_11);
-    size_t sizeB        = cols * sizeof(LNNS16_11);
-    size_t sizeC        = rows * sizeof(LNNS16_11);
+    size_t sizeA        = rows * cols * sizeof(T);
+    size_t sizeB        = cols * sizeof(T);
+    size_t sizeC        = rows * sizeof(T);
     printf("[Matrix-Vector multiplication of %d x %d elements]\n", rows, cols);
 
     // Allocate the host input vector A
-    LNNS16_11 *h_A = (LNNS16_11 *)malloc(sizeA);
+    T *h_A = (T *)malloc(sizeA);
 
     // Allocate the host input vector B
-    LNNS16_11 *h_B = (LNNS16_11 *)malloc(sizeB);
+    T *h_B = (T *)malloc(sizeB);
 
     // Allocate the host output vector C
-    LNNS16_11 *h_C = (LNNS16_11 *)malloc(sizeC);
+    T *h_C = (T *)malloc(sizeC);
 
     // Verify that allocations succeeded
     if (h_A == NULL || h_B == NULL || h_C == NULL) {
@@ -102,7 +107,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_11 *d_A = NULL;
+    T *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, sizeA);
 
     if (err != cudaSuccess) {
@@ -111,7 +116,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_11 *d_B = NULL;
+    T *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, sizeB);
 
     if (err != cudaSuccess) {
@@ -120,7 +125,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_11 *d_C = NULL;
+    T *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, sizeC);
 
     if (err != cudaSuccess) {
@@ -170,11 +175,11 @@ int main(void)
     /*
     // Verify that the result vector is correct
     for (int i = 0; i < rows; ++i) {
-        LNNS16_11 res = h_C[i];
+        T res = h_C[i];
         for (int j = 0; j < cols; ++j) {
             res -= h_A[i * cols + j] * h_B[j];
         }
-        if (fabs(res.toFloat()) > 1e-5) {
+        if ((float)fabs(res) > 1e-5) {
             fprintf(stderr, "Result verification failed at row %d!\n", i);
             exit(EXIT_FAILURE);
         }
@@ -184,11 +189,11 @@ int main(void)
         float expected = 0.0f;
 
         for (int j = 0; j < cols; ++j) {
-            expected += h_A[i * cols + j].toFloat() *
-                        h_B[j].toFloat();
+            expected += (float)h_A[i * cols + j] *
+                        (float)h_B[j];
         }
 
-        float actual = h_C[i].toFloat();
+        float actual = (float)h_C[i];
 
         float error = fabsf(actual - expected);
 
@@ -230,5 +235,32 @@ int main(void)
     free(h_C);
 
     printf("Done\n");
+
+}
+
+/**
+ * Host main routine
+ */
+int main(int argc, char **argv)
+{
+    int testNum = 0;
+    if (checkCmdLineFlag(argc, (const char **)argv, "testNum")) {
+        testNum = getCmdLineArgumentInt(argc, (const char **)argv, "testNum");
+    }
+
+    switch(testNum){
+        case 0: runTest<float>(); break;
+        case 1: runTest<double>(); break;
+        case 2: runTest<EncFp>(); break;
+        case 3: runTest<EncDb>(); break;
+        case 4: runTest<S2_16_10>(); break;
+        case 5: runTest<S2_16_11>(); break;
+        case 6: runTest<S2_32_21>(); break;
+        default:
+            printf("Invalid test number: %d\n", testNum);
+            exit(EXIT_FAILURE);
+    }
+
+
     return 0;
 }

@@ -50,16 +50,23 @@
  * number of elements numElements.
  */
 
+ #include "../../S1.cuh"
  #include "../../S2.cuh"
+ #define numIter 10000
 
- using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_2116 with 21 fractional bits
+using S2_16_10 = LNNS<uint16_t, 10>;
+using S2_16_11 = LNNS<uint16_t, 11>;
+using S2_32_21 = LNNS<uint32_t, 21>;
+using EncFp = Encapsulator<float>;
+using EncDb = Encapsulator<double>;
 
-__global__ void vectorAdd(const LNNS16_21 *A, const LNNS16_21 *B, LNNS16_21 *C, int numElements)
+template<typename T>
+__global__ void vectorAdd(const T *A, const T *B, T *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i < numElements) {
-        C[i] = A[i] + B[i] + LNNS16_21(0.0f);
+        C[i] = A[i] + B[i] + T(0.0f);
     }
 }
 
@@ -75,27 +82,28 @@ __global__ void originalVectorAdd(const float *A, const float *B, float *C, int 
 /**
  * Host main routine
  */
-int main(void)
-{
+
+template<typename T>
+void runTest(int argc, char **argv, const std::string& type) {
     // Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
 
     // Print the vector length to be used, and compute its size
     int    numElements = 50000;
-    size_t size        = numElements * sizeof(LNNS16_21);
+    size_t size        = numElements * sizeof(T);
     size_t size_float  = numElements * sizeof(float);
     printf("[Vector addition of %d elements]\n", numElements);
 
     // Allocate the host input vector A
-    LNNS16_21 *h_A = (LNNS16_21 *)malloc(size);
+    T *h_A = (T *)malloc(size);
     float *h_A_float = (float *)malloc(size_float);
 
     // Allocate the host input vector B
-    LNNS16_21 *h_B = (LNNS16_21 *)malloc(size);
+    T *h_B = (T *)malloc(size);
     float *h_B_float = (float *)malloc(size_float);
 
     // Allocate the host output vector C
-    LNNS16_21 *h_C = (LNNS16_21 *)malloc(size);
+    T *h_C = (T *)malloc(size);
     float *h_C_float = (float *)malloc(size_float);
 
     // Verify that allocations succeeded
@@ -120,7 +128,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_21 *d_A = NULL;
+    T *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, size);
     if (err != cudaSuccess) {
         fprintf(stderr, "Failed to allocate device vector A (error code %s)!\n", cudaGetErrorString(err));
@@ -135,7 +143,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_21 *d_B = NULL;
+    T *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, size);
 
     if (err != cudaSuccess) {
@@ -152,7 +160,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_21 *d_C = NULL;
+    T *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, size);
 
     if (err != cudaSuccess) {
@@ -219,7 +227,7 @@ int main(void)
 	cudaEventCreate(&stopE);
 
     int nWarmup = 200;   // scartati dalla misura: portano il clock GPU a regime
-    int nIter   = 300000;
+    int nIter   = numIter;
 
     // --- Warm-up (non cronometrato) ---
     for (int i = 0; i < nWarmup; i++) {
@@ -335,7 +343,7 @@ int main(void)
     float threshold = 1e-3f;
 
     for(int i = 0; i < elementsA; ++i) {
-        float errorA = fabsf(h_A[i].toFloat() - h_A_float[i]);
+        float errorA = fabsf((float)h_A[i] - h_A_float[i]);
         float den = fabsf(h_A_float[i]) != 0.0f ? fabsf(h_A_float[i]) : 1.0f;
         float relErrorA = fabsf(errorA / den);
         if(relErrorA > maxRelErrorA) maxRelErrorA = relErrorA;
@@ -351,7 +359,7 @@ int main(void)
     avgRelErrorA /= elementsA;
     
     for(int i = 0; i < elementsB; ++i) {
-        float errorB = fabsf(h_B[i].toFloat() - h_B_float[i]);
+        float errorB = fabsf((float)h_B[i] - h_B_float[i]);
         float den = fabsf(h_B_float[i]) != 0.0f ? fabsf(h_B_float[i]) : 1.0f;
         float relErrorB = fabsf(errorB / den);
         if(relErrorB > maxRelErrorB) maxRelErrorB = relErrorB;
@@ -367,7 +375,7 @@ int main(void)
     avgRelErrorB /= elementsB;
     
     for(int i = 0; i < elementsC; ++i) {
-        float errorC = fabsf(h_C[i].toFloat() - h_C_float[i]);
+        float errorC = fabsf((float)h_C[i] - h_C_float[i]);
         float den = fabsf(h_C_float[i]) != 0.0f ? fabsf(h_C_float[i]) : 1.0f;
         float relErrorC = fabsf(errorC / den);
         if(relErrorC > maxRelErrorC) maxRelErrorC = relErrorC;
@@ -383,7 +391,7 @@ int main(void)
 
     saveResultsCSV(
         "vectorAdd_A_results.csv",
-        "LNNS16_21",
+        type,
         elementsA,
         threshold,
         maxAbsErrorA,
@@ -396,7 +404,7 @@ int main(void)
 
     saveResultsCSV(
         "vectorAdd_B_results.csv",
-        "LNNS16_21",
+        type,
         elementsB,
         threshold,
         maxAbsErrorB,
@@ -409,7 +417,7 @@ int main(void)
 
     saveResultsCSV(
         "vectorAdd_C_results.csv",
-        "LNNS16_21",
+        type,
         elementsC,
         threshold,
         maxAbsErrorC,
@@ -422,7 +430,7 @@ int main(void)
 
     saveTimingCSV(
         "vectorAdd_timing.csv",
-        "LNNS16_21",
+        type,
         numElements,
         elapsed,
         elapsed_float
@@ -430,7 +438,7 @@ int main(void)
 
     saveTimingStatsCSV(
         "vectorAdd_timing_stats.csv",
-        "LNNS16_21",
+        type,
         numElements,
         meanLNNS, medianLNNS, stddevLNNS, p95LNNS,
         meanFloat, medianFloat, stddevFloat, p95Float
@@ -492,5 +500,29 @@ int main(void)
     free(h_C_float);
 
     printf("Done\n");
-    return 0;
+
+
+}
+
+
+int main(int argc, char **argv)
+{
+        int testNum = 0;
+        if (checkCmdLineFlag(argc, (const char **)argv, "testNum")) {
+            testNum = getCmdLineArgumentInt(argc, (const char **)argv, "testNum");
+        }
+
+        switch(testNum){
+            case 0: runTest<float>(argc, argv, "float"); break;
+            case 1: runTest<double>(argc, argv, "double"); break;
+            case 2: runTest<EncFp>(argc, argv, "EncFp"); break;
+            case 3: runTest<EncDb>(argc, argv, "EncDb"); break;
+            case 4: runTest<S2_16_10>(argc, argv, "S2_16_10"); break;
+            case 5: runTest<S2_16_11>(argc, argv, "S2_16_11"); break;
+            case 6: runTest<S2_32_21>(argc, argv, "S2_32_21"); break;
+            default:
+                printf("Invalid test number: %d\n", testNum);
+                exit(EXIT_FAILURE);
+        }
+        return 0;
 }

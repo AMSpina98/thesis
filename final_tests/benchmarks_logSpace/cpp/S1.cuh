@@ -130,7 +130,6 @@ struct Encapsulator {
 
     T value;
 
-    __host__ __device__
     Encapsulator() = default;
 
     __host__ __device__
@@ -139,15 +138,19 @@ struct Encapsulator {
     __host__ __device__
     operator T() const { return value; }
 
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
     __host__ __device__ Encapsulator(float x) {
         value = static_cast<T>(x);
     }
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
     __host__ __device__ Encapsulator(double x) {
         value = static_cast<T>(x);
     }
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
     __host__ __device__ Encapsulator(unsigned int x) {
         value = static_cast<T>(x);
     }
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
     __host__ __device__ Encapsulator(int x) {
         value = static_cast<T>(x);
     }
@@ -383,8 +386,16 @@ struct Encapsulator {
     __host__ __device__ unsigned int toUInt() const {
         return static_cast<unsigned int>(value);
     }
-    operator float() const { return toFloat(); }
-    operator double() const { return toDouble(); }
-    operator int() const { return toInt(); }
-    operator unsigned int() const { return toUInt(); }
+    
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, float>::value>::type>
+    __host__ __device__ operator float() const { return toFloat(); }
+
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, double>::value>::type>
+    __host__ __device__ operator double() const { return toDouble(); }
+
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, int>::value>::type>
+    __host__ __device__ operator int() const { return toInt(); }
+
+    template <typename U = T, typename = typename std::enable_if<!std::is_same<U, unsigned int>::value>::type>
+    __host__ __device__ operator unsigned int() const { return toUInt(); }
 };
