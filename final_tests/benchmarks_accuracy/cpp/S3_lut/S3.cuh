@@ -104,42 +104,42 @@ struct LNNS_S3 {
         return (StorageType)(sign | ((StorageType)(uint32_t)m & MANTISSA_MASK));
     }
 
-    // ---- nucleo unico di + e - (e di += e -=): SUB e' una costante a ogni punto di chiamata ----
+    // ---- nuclei SENZA RAMI -------------------------------------------------------------------
+    // Il percorso normale viene calcolato sempre (e' sicuro anche con NaN/zero: k e' limitato a K_CUT,
+    // gli indici restano in tabella, nessun overflow) e i casi speciali sovrascrivono il risultato con
+    // select, in ordine di priorita' crescente. Niente return anticipati => niente BSSY/BSYNC/BMOV.
+    // (In una sottrazione "b" e' gia' stato invertito di segno nel calcolo di sB, mai nei confronti.)
     template <bool SUB>
     S3_HD static StorageType add_core(StorageType a, StorageType b) {
-        if (a == LOG_NAN || b == LOG_NAN) return LOG_NAN;
-        if (SUB) {
-            if (b == LOG_ZERO) return a;
-            if (a == LOG_ZERO) return (StorageType)(SIGN_MASK ^ b);
-        } else {
-            if (a == LOG_ZERO) return b;
-            if (b == LOG_ZERO) return a;
-        }
         const int32_t mA = unpack(a), mB = unpack(b);
         const StorageType sA = (StorageType)(a & SIGN_MASK);
         const StorageType sB = SUB ? (StorageType)((b & SIGN_MASK) ^ SIGN_MASK) : (StorageType)(b & SIGN_MASK);
         const bool same = (sA == sB);
-        if (mA == mB && !same) return LOG_ZERO;                      // x - x
         const bool sw = (mB > mA);
         const int32_t mMax = sw ? mB : mA;
         const int32_t mMin = sw ? mA : mB;
         const StorageType sg = sw ? sB : sA;
-        const uint32_t k = (uint32_t)mMax - (uint32_t)mMin;          // >= 0, < 2^31
+        const uint32_t k = (uint32_t)mMax - (uint32_t)mMin;          // >= 0, < 2^32
         const int32_t R = s3lut::delta_sel<PRECISION_>(k, same);
-        return pack(sg, clampM(mMax + R));
+        StorageType res = pack(sg, clampM(mMax + R));
+        res = (mA == mB && !same) ? (StorageType)LOG_ZERO : res;      // x - x
+        res = (a == LOG_ZERO) ? (SUB ? (StorageType)(SIGN_MASK ^ b) : b) : res;
+        res = (b == LOG_ZERO) ? a : res;                              // priorita' su a == 0 (anche in sub)
+        res = (a == LOG_NAN || b == LOG_NAN) ? (StorageType)LOG_NAN : res;
+        return res;
     }
 
     S3_HD static StorageType mul_core(StorageType a, StorageType b) {
-        if (a == LOG_NAN || b == LOG_NAN) return LOG_NAN;
-        if (a == LOG_ZERO || b == LOG_ZERO) return LOG_ZERO;
-        const int32_t m = clampM(unpack(a) + unpack(b));
-        return pack((StorageType)((a ^ b) & SIGN_MASK), m);
+        StorageType res = pack((StorageType)((a ^ b) & SIGN_MASK), clampM(unpack(a) + unpack(b)));
+        res = (a == LOG_ZERO || b == LOG_ZERO) ? (StorageType)LOG_ZERO : res;
+        res = (a == LOG_NAN || b == LOG_NAN) ? (StorageType)LOG_NAN : res;
+        return res;
     }
     S3_HD static StorageType div_core(StorageType a, StorageType b) {
-        if (a == LOG_NAN || b == LOG_NAN || b == LOG_ZERO) return LOG_NAN;
-        if (a == LOG_ZERO) return LOG_ZERO;
-        const int32_t m = clampM(unpack(a) - unpack(b));
-        return pack((StorageType)((a ^ b) & SIGN_MASK), m);
+        StorageType res = pack((StorageType)((a ^ b) & SIGN_MASK), clampM(unpack(a) - unpack(b)));
+        res = (a == LOG_ZERO) ? (StorageType)LOG_ZERO : res;
+        res = (a == LOG_NAN || b == LOG_NAN || b == LOG_ZERO) ? (StorageType)LOG_NAN : res;
+        return res;
     }
 
     // mantissa scalata (gia' in unita' LSB, double) -> codice, con saturazione prima della conversione
