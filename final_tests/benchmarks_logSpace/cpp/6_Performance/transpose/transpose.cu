@@ -53,7 +53,7 @@ namespace cg = cooperative_groups;
 using S1 = Encapsulator<float>;
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
-using S2_32_21 = LNNS<uint32_t, 21>;
+using S2_32_23 = LNNS<uint32_t, 23>;
 
 
 const char *sSDKsample = "Transpose";
@@ -462,7 +462,7 @@ int main(int argc, char **argv)
             runTest<S2_16_11>(size_x, size_y, deviceProp);
             break;
         case 6:
-            runTest<S2_32_21>(size_x, size_y, deviceProp);
+            runTest<S2_32_23>(size_x, size_y, deviceProp);
             break;
         default:
             printf("Invalid test number: %d\n", testNum);

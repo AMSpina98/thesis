@@ -47,14 +47,14 @@
 
 #include "../../LNNS_type.cuh"
 
-using LNNS16_11 = LNNS<uint32_t, 21>; // 16-bit LNNS16_11 with 11 fractional bits
+using LNNS32_23 = LNNS<uint32_t, 23>; // 32-bit LNNS32_23 with 23 fractional bits
 
-__global__ void matVecMul(const LNNS16_11 *A, const LNNS16_11 *x, LNNS16_11 *y, int rows, int cols)
+__global__ void matVecMul(const LNNS32_23 *A, const LNNS32_23 *x, LNNS32_23 *y, int rows, int cols)
 {
     int row = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (row < rows) {
-        LNNS16_11 sum = 0.0f;
+        LNNS32_23 sum = 0.0f;
         for (int col = 0; col < cols; col++) {
             sum += A[row * cols + col] * x[col];
         }
@@ -73,19 +73,19 @@ int main(void)
     // Print the vector length to be used, and compute its size
     int    rows = 5000;
     int    cols = 5000;
-    size_t sizeA        = rows * cols * sizeof(LNNS16_11);
-    size_t sizeB        = cols * sizeof(LNNS16_11);
-    size_t sizeC        = rows * sizeof(LNNS16_11);
+    size_t sizeA        = rows * cols * sizeof(LNNS32_23);
+    size_t sizeB        = cols * sizeof(LNNS32_23);
+    size_t sizeC        = rows * sizeof(LNNS32_23);
     printf("[Matrix-Vector multiplication of %d x %d elements]\n", rows, cols);
 
     // Allocate the host input vector A
-    LNNS16_11 *h_A = (LNNS16_11 *)malloc(sizeA);
+    LNNS32_23 *h_A = (LNNS32_23 *)malloc(sizeA);
 
     // Allocate the host input vector B
-    LNNS16_11 *h_B = (LNNS16_11 *)malloc(sizeB);
+    LNNS32_23 *h_B = (LNNS32_23 *)malloc(sizeB);
 
     // Allocate the host output vector C
-    LNNS16_11 *h_C = (LNNS16_11 *)malloc(sizeC);
+    LNNS32_23 *h_C = (LNNS32_23 *)malloc(sizeC);
 
     // Verify that allocations succeeded
     if (h_A == NULL || h_B == NULL || h_C == NULL) {
@@ -102,7 +102,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_11 *d_A = NULL;
+    LNNS32_23 *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, sizeA);
 
     if (err != cudaSuccess) {
@@ -111,7 +111,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_11 *d_B = NULL;
+    LNNS32_23 *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, sizeB);
 
     if (err != cudaSuccess) {
@@ -120,7 +120,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_11 *d_C = NULL;
+    LNNS32_23 *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, sizeC);
 
     if (err != cudaSuccess) {

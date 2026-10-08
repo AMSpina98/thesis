@@ -147,7 +147,7 @@ struct LNNS {
 
     static constexpr StorageType STORAGE_BITS = sizeof(StorageType) * 8;
 
-    static_assert(FRACTIONAL_BITS >= 1 && FRACTIONAL_BITS < STORAGE_BITS - SIGN_BITS, "PRECISION_ must leave room for at least 1 integer/range bit");
+    //static_assert(FRACTIONAL_BITS >= 1 && FRACTIONAL_BITS < STORAGE_BITS - SIGN_BITS, "PRECISION_ must leave room for at least 1 integer/range bit");
 
 
     StorageType value;

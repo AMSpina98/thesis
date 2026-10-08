@@ -53,13 +53,13 @@
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
-using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_21 with 21 fractional bits
+using LNNS32_23 = LNNS<uint32_t, 23>; // 16-bit LNNS16_21 with 21 fractional bits
 
 /**
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
  * wA is A's width and wB is B's width
  */
-template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 *A, LNNS16_21 *B, int wA, int wB)
+template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS32_23 *C, LNNS32_23 *A, LNNS32_23 *B, int wA, int wB)
 {
     // Block index
     int bx = blockIdx.x;
@@ -86,18 +86,18 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
-    LNNS16_21 Csub = 0.0f;
+    LNNS32_23 Csub = 0.0f;
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
     for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep) {
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
-        __shared__ LNNS16_21 As[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ LNNS32_23 As[BLOCK_SIZE][BLOCK_SIZE];
 
         // Declaration of the shared memory array Bs used to
         // store the sub-matrix of B
-        __shared__ LNNS16_21 Bs[BLOCK_SIZE][BLOCK_SIZE];
+        __shared__ LNNS32_23 Bs[BLOCK_SIZE][BLOCK_SIZE];
 
         // Load the matrices from device memory
         // to shared memory; each thread loads
@@ -129,7 +129,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(LNNS16_21 *C, LNNS16_21 
     C[c + wB * ty + tx] = Csub;
 }
 
-void ConstantInit(LNNS16_21 *data, int size, LNNS16_21 val)
+void ConstantInit(LNNS32_23 *data, int size, LNNS32_23 val)
 {
     for (int i = 0; i < size; ++i) {
         data[i] = val;
@@ -220,23 +220,23 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 {
     // Allocate host memory for matrices A and B
     unsigned int size_A     = dimsA.x * dimsA.y;
-    unsigned int mem_size_A = sizeof(LNNS16_21) * size_A;
+    unsigned int mem_size_A = sizeof(LNNS32_23) * size_A;
     unsigned int mem_size_A_float = sizeof(float) * size_A;
-    LNNS16_21       *h_A;
+    LNNS32_23       *h_A;
     float *h_A_float;
     checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
     checkCudaErrors(cudaMallocHost(&h_A_float, mem_size_A_float));
     unsigned int size_B     = dimsB.x * dimsB.y;
-    unsigned int mem_size_B = sizeof(LNNS16_21) * size_B;
+    unsigned int mem_size_B = sizeof(LNNS32_23) * size_B;
     unsigned int mem_size_B_float = sizeof(float) * size_B;
-    LNNS16_21       *h_B;
+    LNNS32_23       *h_B;
     float *h_B_float;
     checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
     checkCudaErrors(cudaMallocHost(&h_B_float, mem_size_B_float));
     cudaStream_t stream;
 
     // Initialize host memory
-    const LNNS16_21 valB = 0.01f;
+    const LNNS32_23 valB = 0.01f;
     const float valB_float = 0.01f;
     ConstantInit(h_A, size_A, 1.0f);
     ConstantInit(h_B, size_B, valB);
@@ -244,15 +244,15 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     OriginalConstantInit(h_B_float, size_B, valB_float);
 
     // Allocate device memory
-    LNNS16_21 *d_A, *d_B, *d_C;
+    LNNS32_23 *d_A, *d_B, *d_C;
     float *d_A_float, *d_B_float, *d_C_float;
 
     // Allocate host matrix C
     dim3         dimsC(dimsB.x, dimsA.y, 1);
     unsigned int size_C     = dimsC.x * dimsC.y;
-    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(LNNS16_21);
+    unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(LNNS32_23);
     unsigned int mem_size_C_float = dimsC.x * dimsC.y * sizeof(float);
-    LNNS16_21       *h_C;
+    LNNS32_23       *h_C;
     float *h_C_float;
     checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
     checkCudaErrors(cudaMallocHost(&h_C_float, mem_size_C_float));

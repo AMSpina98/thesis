@@ -49,6 +49,10 @@
 #include "./../../S1.cuh"
 #include "./../../S2.cuh"
 #include "../../utility.cu"
+#include "../../S3_lut/S3.cuh"
+
+using S3_16_10 = LNNS_S3<uint16_t, 10>;
+using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
 // Helper functions and utilities to work with CUDA
 #include <helper_cuda.h>
@@ -57,7 +61,7 @@
 
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
-using S2_32_21 = LNNS<uint32_t, 21>;
+using S2_32_23 = LNNS<uint32_t, 23>;
 using EncFp = Encapsulator<float>;
 using EncDb = Encapsulator<double>;
 
@@ -246,9 +250,9 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     // Initialize host memory
     const T valB = 0.01f;
     const float valB_float = 0.01f;
-    ConstantInit(h_A, size_A, 1.0f);
+    ConstantInit(h_A, size_A, (T)1.0f);
     ConstantInit(h_B, size_B, valB);
-    OriginalConstantInit(h_A_float, size_A, 1.0f);
+    OriginalConstantInit(h_A_float, size_A, (T)1.0f);
     OriginalConstantInit(h_B_float, size_B, valB_float);
 
     // Allocate device memory
@@ -327,32 +331,32 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
 
     for (int j = 0; j < nIter; j++) {
         if (block_size == 16) {
-            cudaEventRecord(startE);
+            cudaEventRecord(startE, stream);
             MatrixMulCUDA<16><<<grid, threads, 0, stream>>>(d_C, d_A, d_B, dimsA.x, dimsB.x);
-            cudaEventRecord(stopE);
+            cudaEventRecord(stopE, stream);
             cudaEventSynchronize(stopE);
             float elapsed_temp;
             cudaEventElapsedTime(&elapsed_temp, startE, stopE);
             elapsed += elapsed_temp;
-            cudaEventRecord(startE);
+            cudaEventRecord(startE, stream);
             OriginalMatrixMulCUDA<16><<<grid, threads, 0, stream>>>(d_C_float, d_A_float, d_B_float, dimsA.x, dimsB.x);
-            cudaEventRecord(stopE);
+            cudaEventRecord(stopE, stream);
             cudaEventSynchronize(stopE);
             float elapsed_temp_float;
             cudaEventElapsedTime(&elapsed_temp_float, startE, stopE);
             elapsed_float += elapsed_temp_float;
         }
         else {
-            cudaEventRecord(startE);
+            cudaEventRecord(startE, stream);
             MatrixMulCUDA<32><<<grid, threads, 0, stream>>>(d_C, d_A, d_B, dimsA.x, dimsB.x);
-            cudaEventRecord(stopE);
+            cudaEventRecord(stopE, stream);
             cudaEventSynchronize(stopE);
             float elapsed_temp;
             cudaEventElapsedTime(&elapsed_temp, startE, stopE);
             elapsed += elapsed_temp;
-            cudaEventRecord(startE);
+            cudaEventRecord(startE, stream);
             OriginalMatrixMulCUDA<32><<<grid, threads, 0, stream>>>(d_C_float, d_A_float, d_B_float, dimsA.x, dimsB.x);
-            cudaEventRecord(stopE);
+            cudaEventRecord(stopE, stream);
             cudaEventSynchronize(stopE);
             float elapsed_temp_float;
             cudaEventElapsedTime(&elapsed_temp_float, startE, stopE);
@@ -627,7 +631,19 @@ int main(int argc, char **argv)
         }
         case 6: {
             checkCudaErrors(cudaProfilerStart());
-            matrix_result = MatrixMultiply<S2_32_21>(argc, argv, block_size, dimsA, dimsB, "S2_32_21");
+            matrix_result = MatrixMultiply<S2_32_23>(argc, argv, block_size, dimsA, dimsB, "S2_32_23");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 7: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<S3_16_10>(argc, argv, block_size, dimsA, dimsB, "S3_16_10");
+            checkCudaErrors(cudaProfilerStop());
+            break;
+        }
+        case 8: {
+            checkCudaErrors(cudaProfilerStart());
+            matrix_result = MatrixMultiply<S3_32_21>(argc, argv, block_size, dimsA, dimsB, "S3_32_21");
             checkCudaErrors(cudaProfilerStop());
             break;
         }

@@ -36,7 +36,7 @@
 // dove vanno elencate.
 using LNNS16_10 = LNNS<unsigned short, 10>;
 using LNNS16_11 = LNNS<unsigned short, 11>;
-using LNNS32_21 = LNNS<unsigned int, 21>;
+using LNNS32_23 = LNNS<unsigned int, 23>;
 
 template <typename Callable>
 void dispatchByTypeName(const std::string& name, Callable&& callable) {
@@ -46,12 +46,12 @@ void dispatchByTypeName(const std::string& name, Callable&& callable) {
         callable.template operator()<LNNS16_10>(name);
     } else if (name == "lnns16_11") {
         callable.template operator()<LNNS16_11>(name);
-    } else if (name == "lnns32_21") {
-        callable.template operator()<LNNS32_21>(name);
+    } else if (name == "lnns32_23") {
+        callable.template operator()<LNNS32_23>(name);
     } else if (name == "encaps_float") {
         callable.template operator()<Encapsulator<float>>(name);
     } else {
         throw std::runtime_error("Formato non riconosciuto: '" + name +
-            "' (attesi: float, lnns16_10, lnns16_11, lnns32_21, encaps_float)");
+            "' (attesi: float, lnns16_10, lnns16_11, lnns32_23, encaps_float)");
     }
 }

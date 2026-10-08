@@ -41,7 +41,7 @@
 
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
-using S2_32_21 = LNNS<uint32_t, 21>;
+using S2_32_23= LNNS<uint32_t, 23>;
 
 namespace cg = cooperative_groups;
 
@@ -109,18 +109,18 @@ template<> struct SharedMemory<S2_16_11>
     }
 };
 
-template<> struct SharedMemory<S2_32_21>
+template<> struct SharedMemory<S2_32_23>
 {
-    __device__ inline operator S2_32_21 *()
+    __device__ inline operator S2_32_23 *()
     {
         extern __shared__ int __smem[];
-        return (S2_32_21 *)__smem;
+        return (S2_32_23 *)__smem;
     }
 
-    __device__ inline operator const S2_32_21 *() const
+    __device__ inline operator const S2_32_23 *() const
     {
         extern __shared__ int __smem[];
-        return (S2_32_21 *)__smem;
+        return (S2_32_23 *)__smem;
     }
 };
 
@@ -214,7 +214,7 @@ template void reduce<S2_16_10>(int size, int threads, int blocks, S2_16_10 *d_id
 
 template void reduce<S2_16_11>(int size, int threads, int blocks, S2_16_11 *d_idata, S2_16_11 *d_odata);
 
-template void reduce<S2_32_21>(int size, int threads, int blocks, S2_32_21 *d_idata, S2_32_21 *d_odata);
+template void reduce<S2_32_23>(int size, int threads, int blocks, S2_32_23 *d_idata, S2_32_23 *d_odata);
 
 template void reduce<Encapsulator<float>>(int size, int threads, int blocks, Encapsulator<float> *d_idata, Encapsulator<float> *d_odata);
 

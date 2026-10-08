@@ -19,8 +19,8 @@ ncu -o ../../results/transpose/reports/transpose_s2_16_10_naive --set full --ker
 ncu -o ../../results/transpose/reports/transpose_s2_16_10_opt --set full --kernel-name transposeNoBankConflicts --launch-skip 1 --launch-count 1 a.exe -testNum=4
 ncu -o ../../results/transpose/reports/transpose_s2_16_11_naive --set full --kernel-name transposeNaive --launch-skip 1 --launch-count 1 a.exe -testNum=5
 ncu -o ../../results/transpose/reports/transpose_s2_16_11_opt --set full --kernel-name transposeNoBankConflicts --launch-skip 1 --launch-count 1 a.exe -testNum=5
-ncu -o ../../results/transpose/reports/transpose_s2_32_21_naive --set full --kernel-name transposeNaive --launch-skip 1 --launch-count 1 a.exe -testNum=6
-ncu -o ../../results/transpose/reports/transpose_s2_32_21_opt --set full --kernel-name transposeNoBankConflicts --launch-skip 1 --launch-count 1 a.exe -testNum=6
+ncu -o ../../results/transpose/reports/transpose_s2_32_23_naive --set full --kernel-name transposeNaive --launch-skip 1 --launch-count 1 a.exe -testNum=6
+ncu -o ../../results/transpose/reports/transpose_s2_32_23_opt --set full --kernel-name transposeNoBankConflicts --launch-skip 1 --launch-count 1 a.exe -testNum=6
 
 ncu --import ../../results/transpose/reports/transpose_float_naive.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_float_naive.csv
 ncu --import ../../results/transpose/reports/transpose_float_opt.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_float_opt.csv
@@ -34,6 +34,6 @@ ncu --import ../../results/transpose/reports/transpose_s2_16_10_naive.ncu-rep --
 ncu --import ../../results/transpose/reports/transpose_s2_16_10_opt.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_16_10_opt.csv
 ncu --import ../../results/transpose/reports/transpose_s2_16_11_naive.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_16_11_naive.csv
 ncu --import ../../results/transpose/reports/transpose_s2_16_11_opt.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_16_11_opt.csv
-ncu --import ../../results/transpose/reports/transpose_s2_32_21_naive.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_32_21_naive.csv
-ncu --import ../../results/transpose/reports/transpose_s2_32_21_opt.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_32_21_opt.csv
+ncu --import ../../results/transpose/reports/transpose_s2_32_23_naive.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_32_23_naive.csv
+ncu --import ../../results/transpose/reports/transpose_s2_32_23_opt.ncu-rep --csv --page raw > ../../results/transpose/csv/transpose_s2_32_23_opt.csv
 )

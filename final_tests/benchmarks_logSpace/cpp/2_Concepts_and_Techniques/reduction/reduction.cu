@@ -65,10 +65,14 @@
 #include <cuda_runtime.h>
 #include "../../S2.cuh"
 #include "../../S1.cuh"
+#include "../../S3_lut/S3.cuh"
+
+using S3_16_10 = LNNS_S3<uint16_t, 10>;
+using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
-using S2_32_21 = LNNS<uint32_t, 21>;
+using S2_32_23 = LNNS<uint32_t, 23>;
 
 
 // Utilities and system includes
@@ -79,7 +83,7 @@ using S2_32_21 = LNNS<uint32_t, 21>;
 // includes, project
 #include "reduction.h"
 
-enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE, REDUCE_S2_16_10, REDUCE_S2_16_11, REDUCE_S2_32_21, REDUCE_ENCAPSULATOR_FLOAT, REDUCE_ENCAPSULATOR_DOUBLE };
+enum ReduceType { REDUCE_INT, REDUCE_FLOAT, REDUCE_DOUBLE, REDUCE_S2_16_10, REDUCE_S2_16_11, REDUCE_S2_32_23, REDUCE_S3_16_10, REDUCE_S3_32_21, REDUCE_ENCAPSULATOR_FLOAT, REDUCE_ENCAPSULATOR_DOUBLE };
 
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
@@ -106,8 +110,12 @@ const char *getReduceTypeString(const ReduceType type)
         return "S2_16_10";
     case REDUCE_S2_16_11:
         return "S2_16_11";
-    case REDUCE_S2_32_21:
-        return "S2_32_21";
+    case REDUCE_S2_32_23:
+        return "S2_32_23";
+    case REDUCE_S3_16_10:
+        return "S3_16_10";
+    case REDUCE_S3_32_21:
+        return "S3_32_21";
     case REDUCE_ENCAPSULATOR_FLOAT:
         return "Encapsulator<float>";
     case REDUCE_ENCAPSULATOR_DOUBLE:
@@ -142,8 +150,8 @@ int main(int argc, char **argv)
         else if (!strcasecmp(typeInput, "S2_16_11")) {
             datatype = REDUCE_S2_16_11;
         }
-        else if (!strcasecmp(typeInput, "S2_32_21")) {
-            datatype = REDUCE_S2_32_21;
+        else if (!strcasecmp(typeInput, "S2_32_23")) {
+            datatype = REDUCE_S2_32_23;
         }
         else if (!strcasecmp(typeInput, "Encapsulator<float>")) {
             datatype = REDUCE_ENCAPSULATOR_FLOAT;
@@ -189,8 +197,8 @@ int main(int argc, char **argv)
     case REDUCE_S2_16_11:
         bResult = runTest<S2_16_11>(argc, argv, datatype);
         break;
-    case REDUCE_S2_32_21:
-        bResult = runTest<S2_32_21>(argc, argv, datatype);
+    case REDUCE_S2_32_23:
+        bResult = runTest<S2_32_23>(argc, argv, datatype);
         break;
     case REDUCE_ENCAPSULATOR_FLOAT:
         bResult = runTest<Encapsulator<float>>(argc, argv, datatype);
@@ -580,7 +588,7 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
                 precision = 8;
                 threshold = 1e-4 * size;
             }
-            else if (datatype == REDUCE_S2_32_21) {
+            else if (datatype == REDUCE_S2_32_23) {
                 precision = 12;
                 threshold = 1e-8 * size;
             }

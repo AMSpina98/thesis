@@ -52,9 +52,9 @@
 
  #include "../LNNS_type.cuh"
 
- using LNNS16_21 = LNNS<uint32_t, 21>; // 16-bit LNNS16_2116 with 21 fractional bits
+ using LNNS32_23 = LNNS<uint32_t, 23>; // 32-bit LNNS32_23 with 23 fractional bits
 
-__global__ void vectorAdd(const LNNS16_21 *A, const LNNS16_21 *B, LNNS16_21 *C, int numElements)
+__global__ void vectorAdd(const LNNS32_23 *A, const LNNS32_23 *B, LNNS32_23 *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -82,20 +82,20 @@ int main(void)
 
     // Print the vector length to be used, and compute its size
     int    numElements = 50000;
-    size_t size        = numElements * sizeof(LNNS16_21);
+    size_t size        = numElements * sizeof(LNNS32_23);
     size_t size_float  = numElements * sizeof(float);
     printf("[Vector addition of %d elements]\n", numElements);
 
     // Allocate the host input vector A
-    LNNS16_21 *h_A = (LNNS16_21 *)malloc(size);
+    LNNS32_23 *h_A = (LNNS32_23 *)malloc(size);
     float *h_A_float = (float *)malloc(size_float);
 
     // Allocate the host input vector B
-    LNNS16_21 *h_B = (LNNS16_21 *)malloc(size);
+    LNNS32_23 *h_B = (LNNS32_23 *)malloc(size);
     float *h_B_float = (float *)malloc(size_float);
 
     // Allocate the host output vector C
-    LNNS16_21 *h_C = (LNNS16_21 *)malloc(size);
+    LNNS32_23 *h_C = (LNNS32_23 *)malloc(size);
     float *h_C_float = (float *)malloc(size_float);
 
     // Verify that allocations succeeded
@@ -120,7 +120,7 @@ int main(void)
     }
 
     // Allocate the device input vector A
-    LNNS16_21 *d_A = NULL;
+    LNNS32_23 *d_A = NULL;
     err        = cudaMalloc((void **)&d_A, size);
     if (err != cudaSuccess) {
         fprintf(stderr, "Failed to allocate device vector A (error code %s)!\n", cudaGetErrorString(err));
@@ -135,7 +135,7 @@ int main(void)
     }
 
     // Allocate the device input vector B
-    LNNS16_21 *d_B = NULL;
+    LNNS32_23 *d_B = NULL;
     err        = cudaMalloc((void **)&d_B, size);
 
     if (err != cudaSuccess) {
@@ -152,7 +152,7 @@ int main(void)
     }
 
     // Allocate the device output vector C
-    LNNS16_21 *d_C = NULL;
+    LNNS32_23 *d_C = NULL;
     err        = cudaMalloc((void **)&d_C, size);
 
     if (err != cudaSuccess) {

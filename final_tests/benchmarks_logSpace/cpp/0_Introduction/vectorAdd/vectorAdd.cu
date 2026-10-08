@@ -47,10 +47,14 @@
 
  #include "../../S1.cuh"
  #include "../../S2.cuh"
+#include "../../S3_lut/S3.cuh"
+
+using S3_16_10 = LNNS_S3<uint16_t, 10>;
+using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
-using S2_32_21 = LNNS<uint32_t, 21>;
+using S2_32_23= LNNS<uint32_t, 23>;
 using EncFp = Encapsulator<float>;
 using EncDb = Encapsulator<double>;
 
@@ -228,7 +232,9 @@ int main(int argc, char **argv)
             case 3: runTest<EncDb>(argc, argv); break;
             case 4: runTest<S2_16_10>(argc, argv); break;
             case 5: runTest<S2_16_11>(argc, argv); break;
-            case 6: runTest<S2_32_21>(argc, argv); break;
+            case 6: runTest<S2_32_23>(argc, argv); break;
+            case 7: runTest<S3_16_10>(argc, argv); break;
+            case 8: runTest<S3_32_21>(argc, argv); break;
             default:
                 printf("Invalid test number: %d\n", testNum);
                 exit(EXIT_FAILURE);

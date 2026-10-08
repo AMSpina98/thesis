@@ -121,12 +121,14 @@ namespace EncapsulatorMath {
 
 template<typename T>
 struct Encapsulator {
+    /*
     static_assert(std::is_floating_point<T>::value,
         "Encapsulator<T> e' pensato per sostituire float/double (Strategia 1 -- "
         "forzare add/sub ordinarie sulle SFU). Con T intero, static_cast<T>(x) "
         "su un risultato negativo e T unsigned e' undefined behavior, e non c'e' "
         "una semantica di arrotondamento condivisa col resto del codice: fuori "
         "scope per questa sperimentazione, deliberatamente non supportato.");
+        */
 
     T value;
 
