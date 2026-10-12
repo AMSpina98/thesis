@@ -1,6 +1,6 @@
 // ======================================================================================
 // S3_tables_16_10.cuh -- GENERATO da gen_s3_tables.py. NON MODIFICARE A MANO.
-// Comando: python3 gen_s3_tables.py --preset 16_10 --outdir /tmp/gn
+// Comando: python3 gen_s3_tables.py --preset 16_10 --outdir .
 // Parametri: F=10  ORDER=1  G=6  errore obiettivo (pre-arrotondamento) <= 0.05 LSB
 // K_CUT=7808: la valutazione limita k a K_CUT; la voce di indice idx(K_CUT) e' a zero => R+ = R- = 0 per k >= K_CUT
 // M=6 (comune)   voci da 8 B (T, dT)   tabella unica: [f+: 507 voci][f-: 507 voci] = 8112 B
@@ -545,6 +545,9 @@ template <> struct Tab<10> {
     // grandezze massime della valutazione intera (per scegliere 32 o 64 bit nel valutatore)
     static constexpr long long VMAX = 489032;
     static constexpr long long PMAX = 9765;
+    // solo ORDER=2: |c2*r+half| max (1o stadio) e |t+c1| max (fattore del 2o prodotto); 0 se ORDER=1
+    static constexpr long long P1MAX = 0;
+    static constexpr long long SMAX  = 0;
     // checksum (somma R, somma k*R, mod 2^64) su k = 1 .. K_CUT-1
     static constexpr uint64_t CHK_PLUS_1  = 0x00000000000d2615ull;
     static constexpr uint64_t CHK_PLUS_2  = 0x0000000039807a90ull;

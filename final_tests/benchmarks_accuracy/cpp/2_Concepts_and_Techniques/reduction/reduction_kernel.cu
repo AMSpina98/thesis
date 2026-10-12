@@ -38,10 +38,13 @@
 
 #include "../../S1.cuh"
 #include "../../S2.cuh"
+#include "../../S3_lut/S3.cuh"
 
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
 using S2_32_23 = LNNS<uint32_t, 23>;
+using S3_16_10 = LNNS_S3<uint16_t, 10>;
+using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
 namespace cg = cooperative_groups;
 
@@ -106,6 +109,36 @@ template<> struct SharedMemory<S2_16_11>
     {
         extern __shared__ int __smem[];
         return (S2_16_11 *)__smem;
+    }
+};
+
+template<> struct SharedMemory<S3_16_10>
+{
+    __device__ inline operator S3_16_10 *()
+    {
+        extern __shared__ int __smem[];
+        return (S3_16_10 *)__smem;
+    }
+
+    __device__ inline operator const S3_16_10 *() const
+    {
+        extern __shared__ int __smem[];
+        return (S3_16_10 *)__smem;
+    }
+};
+
+template<> struct SharedMemory<S3_32_21>
+{
+    __device__ inline operator S3_32_21 *()
+    {
+        extern __shared__ int __smem[];
+        return (S3_32_21 *)__smem;
+    }
+
+    __device__ inline operator const S3_32_21 *() const
+    {
+        extern __shared__ int __smem[];
+        return (S3_32_21 *)__smem;
     }
 };
 
@@ -215,6 +248,8 @@ template void reduce<S2_16_10>(int size, int threads, int blocks, S2_16_10 *d_id
 template void reduce<S2_16_11>(int size, int threads, int blocks, S2_16_11 *d_idata, S2_16_11 *d_odata);
 
 template void reduce<S2_32_23>(int size, int threads, int blocks, S2_32_23 *d_idata, S2_32_23 *d_odata);
+template void reduce<S3_16_10>(int size, int threads, int blocks, S3_16_10 *d_idata, S3_16_10 *d_odata);
+template void reduce<S3_32_21>(int size, int threads, int blocks, S3_32_21 *d_idata, S3_32_21 *d_odata);
 
 template void reduce<Encapsulator<float>>(int size, int threads, int blocks, Encapsulator<float> *d_idata, Encapsulator<float> *d_odata);
 

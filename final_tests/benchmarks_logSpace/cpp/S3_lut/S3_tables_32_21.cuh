@@ -1,6 +1,6 @@
 // ======================================================================================
 // S3_tables_32_21.cuh -- GENERATO da gen_s3_tables.py. NON MODIFICARE A MANO.
-// Comando: python3 gen_s3_tables.py --preset 32_21 --outdir /tmp/gn
+// Comando: python3 gen_s3_tables.py --preset 32_21 --outdir .
 // Parametri: F=21  ORDER=2  G=4  errore obiettivo (pre-arrotondamento) <= 0.25 LSB
 // K_CUT=31981568: la valutazione limita k a K_CUT; la voce di indice idx(K_CUT) e' a zero => R+ = R- = 0 per k >= K_CUT
 // M=6 (comune)   voci da 16 B (c0, c1, c2, pad)   tabella unica: [f+: 251 voci][f-: 1275 voci] = 24416 B
@@ -801,6 +801,9 @@ template <> struct Tab<21> {
     // grandezze massime della valutazione intera (per scegliere 32 o 64 bit nel valutatore)
     static constexpr long long VMAX = 488421367;
     static constexpr long long PMAX = 34090782720;
+    // solo ORDER=2: |c2*r+half| max (1o stadio) e |t+c1| max (fattore del 2o prodotto); 0 se ORDER=1
+    static constexpr long long P1MAX = 268464128;
+    static constexpr long long SMAX  = 524288;
     // checksum (somma R, somma k*R, mod 2^64) su k = 1 .. K_CUT-1
     static constexpr uint64_t CHK_PLUS_1  = 0x0000034a34c53f6cull;
     static constexpr uint64_t CHK_PLUS_2  = 0x7365b788356d4a0cull;

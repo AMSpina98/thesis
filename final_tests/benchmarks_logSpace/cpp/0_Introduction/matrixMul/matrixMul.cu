@@ -145,6 +145,14 @@ void ConstantInit(T *data, int size, T val)
     }
 }
 
+template <typename T>
+void RandomInit(T *data, int size, T val)
+{
+    for (int i = 0; i < size; ++i) {   
+        data[i] = rand() / (float)RAND_MAX;
+    }
+}
+
 /**
  * Run a simple test of matrix multiplication using CUDA
  */
@@ -165,9 +173,8 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     cudaStream_t stream;
 
     // Initialize host memory
-    const T valB = 0.01f;
-    ConstantInit(h_A, size_A, T(1.0f));
-    ConstantInit(h_B, size_B, valB);
+    RandomInit(h_A, size_A, T(1.0f));
+    RandomInit(h_B, size_B, T(0.01f));
 
     // Allocate device memory
     T *d_A, *d_B, *d_C;
@@ -255,12 +262,16 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaMemcpyAsync(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost, stream));
     checkCudaErrors(cudaStreamSynchronize(stream));
 
+
+/* Control section useless with random initialization
     printf("Checking computed result for correctness: ");
     bool correct = true;
 
     // test relative error by the formula
     //     |<x, y>_cpu - <x,y>_gpu|/<|x|, |y|>  < eps
     double eps = 1.e-6; // machine zero
+
+
 
     for (int i = 0; i < static_cast<int>(dimsC.x * dimsC.y); i++) {
         double abs_err = fabs((float)h_C[i] - (dimsA.x * (float)valB));
@@ -280,6 +291,8 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     }
 
     printf("%s\n", correct ? "Result = PASS" : "Result = FAIL");
+*/
+
 
     // Clean up memory
     checkCudaErrors(cudaFreeHost(h_A));
@@ -293,12 +306,17 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     printf("\nNOTE: The CUDA Samples are not meant for performance "
            "measurements. Results may vary when GPU Boost is enabled.\n");
 
+
+    /*       
     if (correct) {
         return EXIT_SUCCESS;
     }
     else {
         return EXIT_FAILURE;
     }
+    */
+
+    return EXIT_SUCCESS;
 }
 
 

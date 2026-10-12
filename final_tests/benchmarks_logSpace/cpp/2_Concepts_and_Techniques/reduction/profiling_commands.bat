@@ -7,15 +7,15 @@ nvcc -I../../../Common -std=c++17 -Xcompiler "/Zc:preprocessor" reduction.cu red
 if errorlevel 1 exit /b 1
 
 (
-ncu -o ../../results/reduction/reports/reduction_float --set full --launch-skip 1 --launch-count 1 a.exe -type=float
-ncu -o ../../results/reduction/reports/reduction_double --set full --launch-skip 1 --launch-count 1 a.exe -type=double
-ncu -o ../../results/reduction/reports/reduction_encfp --set full --launch-skip 1 --launch-count 1 a.exe -type="Encapsulator<float>"
-ncu -o ../../results/reduction/reports/reduction_encdb --set full --launch-skip 1 --launch-count 1 a.exe -type="Encapsulator<double>"
-ncu -o ../../results/reduction/reports/reduction_s2_16_10 --set full --launch-skip 1 --launch-count 1 a.exe -type=S2_16_10
-ncu -o ../../results/reduction/reports/reduction_s2_16_11 --set full --launch-skip 1 --launch-count 1 a.exe -type=S2_16_11
-ncu -o ../../results/reduction/reports/reduction_s2_32_23 --set full --launch-skip 1 --launch-count 1 a.exe -type=S2_32_23
-ncu -o ../../results/reduction/reports/reduction_s3_16_10 --set full --launch-skip 1 --launch-count 1 a.exe -type=S3_16_10
-ncu -o ../../results/reduction/reports/reduction_s3_32_21 --set full --launch-skip 1 --launch-count 1 a.exe -type=S3_32_21
+ncu -o ../../results/reduction/reports/reduction_float --set full --launch-skip 1 --launch-count 22 a.exe -type=float
+ncu -o ../../results/reduction/reports/reduction_double --set full --launch-skip 1 --launch-count 22 a.exe -type=double
+ncu -o ../../results/reduction/reports/reduction_encfp --set full --launch-skip 1 --launch-count 22 a.exe -type="Encapsulator<float>"
+ncu -o ../../results/reduction/reports/reduction_encdb --set full --launch-skip 1 --launch-count 22 a.exe -type="Encapsulator<double>"
+ncu -o ../../results/reduction/reports/reduction_s2_16_10 --set full --launch-skip 1 --launch-count 22 a.exe -type=S2_16_10
+ncu -o ../../results/reduction/reports/reduction_s2_16_11 --set full --launch-skip 1 --launch-count 22 a.exe -type=S2_16_11
+ncu -o ../../results/reduction/reports/reduction_s2_32_23 --set full --launch-skip 1 --launch-count 22 a.exe -type=S2_32_23
+ncu -o ../../results/reduction/reports/reduction_s3_16_10 --set full --launch-skip 1 --launch-count 22 a.exe -type=S3_16_10
+ncu -o ../../results/reduction/reports/reduction_s3_32_21 --set full --launch-skip 1 --launch-count 22 a.exe -type=S3_32_21
 
 ncu --import ../../results/reduction/reports/reduction_float.ncu-rep --csv --page raw > ../../results/reduction/csv/reduction_float.csv
 ncu --import ../../results/reduction/reports/reduction_double.ncu-rep --csv --page raw > ../../results/reduction/csv/reduction_double.csv

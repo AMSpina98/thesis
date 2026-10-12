@@ -153,6 +153,12 @@ int main(int argc, char **argv)
         else if (!strcasecmp(typeInput, "S2_32_23")) {
             datatype = REDUCE_S2_32_23;
         }
+        else if (!strcasecmp(typeInput, "S3_16_10")) {
+            datatype = REDUCE_S3_16_10;
+        }
+        else if (!strcasecmp(typeInput, "S3_32_21")) {
+            datatype = REDUCE_S3_32_21;
+        }
         else if (!strcasecmp(typeInput, "Encapsulator<float>")) {
             datatype = REDUCE_ENCAPSULATOR_FLOAT;
         }
@@ -199,6 +205,12 @@ int main(int argc, char **argv)
         break;
     case REDUCE_S2_32_23:
         bResult = runTest<S2_32_23>(argc, argv, datatype);
+        break;
+    case REDUCE_S3_16_10:
+        bResult = runTest<S3_16_10>(argc, argv, datatype);
+        break;
+    case REDUCE_S3_32_21:
+        bResult = runTest<S3_32_21>(argc, argv, datatype);
         break;
     case REDUCE_ENCAPSULATOR_FLOAT:
         bResult = runTest<Encapsulator<float>>(argc, argv, datatype);
@@ -589,6 +601,14 @@ template <class T> bool runTest(int argc, char **argv, ReduceType datatype)
                 threshold = 1e-4 * size;
             }
             else if (datatype == REDUCE_S2_32_23) {
+                precision = 12;
+                threshold = 1e-8 * size;
+            }
+            else if (datatype == REDUCE_S3_16_10) {
+                precision = 8;
+                threshold = 1e-4 * size;
+            }
+            else if (datatype == REDUCE_S3_32_21) {
                 precision = 12;
                 threshold = 1e-8 * size;
             }

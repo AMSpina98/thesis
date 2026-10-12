@@ -52,6 +52,12 @@
 #include "../../S2.cuh"
 #include "../../S3_lut/S3.cuh"
 
+// Numero di lanci aggiuntivi del kernel dopo il primo (warm-up), per avere piu' campioni
+// in ncu (come matrixMul: 1 warm-up + 10). Metti -DPROFILE_REPS=0 per disattivarli.
+#ifndef PROFILE_REPS
+#define PROFILE_REPS 10
+#endif
+
 using S3_16_10 = LNNS_S3<uint16_t, 10>;
 using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
@@ -190,6 +196,9 @@ void runTest(){
     printf("CUDA kernel launch with %d blocks of %d threads (%zu bytes shared mem/block)\n",
            blocksPerGrid, threadsPerBlock, sharedMemBytes);
     matVecMul<<<blocksPerGrid, threadsPerBlock, sharedMemBytes>>>(d_A, d_B, d_C, rows, cols);
+    for (int rep = 0; rep < PROFILE_REPS; ++rep) {
+        matVecMul<<<blocksPerGrid, threadsPerBlock, sharedMemBytes>>>(d_A, d_B, d_C, rows, cols);
+    }
     err = cudaGetLastError();
 
     if (err != cudaSuccess) {

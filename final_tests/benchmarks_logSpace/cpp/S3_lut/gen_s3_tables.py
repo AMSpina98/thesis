@@ -152,24 +152,26 @@ def eval_int(tab, order, g, m, emin, k):
         sh = e + g
         R = np.right_shift(V + np.left_shift(np.int64(1), sh - 1), sh)
         Vreal = V.astype(np.float64) / np.exp2(sh.astype(np.float64))
-        w = dict(V=int(np.abs(V).max()), prod=int(np.abs(d * r).max()))
+        w = dict(V=int(np.abs(V).max()), prod=int(np.abs(d * r).max()), p1=0, sm=0)
     else:
         c0 = tab[idx, 0]; c1 = tab[idx, 1]; c2 = tab[idx, 2]
         half = np.right_shift(np.left_shift(np.int64(1), e), 1)
         p2 = c2 * r
         t = np.right_shift(p2 + half, e)
+        sm_ = np.abs(t + c1).max()
         p1 = (t + c1) * r
         t = np.right_shift(p1 + half, e)
         V = c0 + t
         R = np.right_shift(V + (1 << (g - 1)), g)
         Vreal = V.astype(np.float64) / float(1 << g)
-        w = dict(V=int(np.abs(V).max()), prod=int(max(np.abs(p2).max(), np.abs(p1).max())))
+        w = dict(V=int(np.abs(V).max()), prod=int(max(np.abs(p2).max(), np.abs(p1).max())),
+                 p1=int(np.abs(p2 + half).max()), sm=int(sm_))
     return R, Vreal, w
 
 def exhaustive(which, tab, F, order, g, m, emin, kend, chunk=1 << 22):
     """verifica su tutti i k in [k0, kend). Ritorna statistiche e checksum."""
     k0 = 0 if which == "p" else 1
-    st = dict(maxpre=0.0, maxabs=0.0, sumabs=0.0, n=0, mism=0, maxdiff=0, V=0, prod=0)
+    st = dict(maxpre=0.0, maxabs=0.0, sumabs=0.0, n=0, mism=0, maxdiff=0, V=0, prod=0, p1=0, sm=0)
     s1 = 0; s2 = 0; MASK = (1 << 64) - 1
     for a in range(k0, kend, chunk):
         k = np.arange(a, min(a + chunk, kend), dtype=np.int64)
@@ -183,6 +185,7 @@ def exhaustive(which, tab, F, order, g, m, emin, kend, chunk=1 << 22):
         st["mism"] += int(np.count_nonzero(R != rr)); st["n"] += len(k)
         st["maxdiff"] = max(st["maxdiff"], int(np.abs(R - rr).max()))
         st["V"] = max(st["V"], w["V"]); st["prod"] = max(st["prod"], w["prod"])
+        st["p1"] = max(st["p1"], w["p1"]); st["sm"] = max(st["sm"], w["sm"])
         sel = k >= 1                                      # i checksum partono da k=1
         Ru = R[sel].astype(np.int64).astype(np.uint64); ku = k[sel].astype(np.uint64)
         s1 = (s1 + int(Ru.sum(dtype=np.uint64))) & MASK
@@ -325,6 +328,9 @@ def emit_header(path, F, order, g, target, kc, m, ep_, em_, Ep, Em, kzp, kzm, sp
     out.append("    // grandezze massime della valutazione intera (per scegliere 32 o 64 bit nel valutatore)")
     out.append("    static constexpr long long VMAX = %d;" % max(sp["V"], sm["V"]))
     out.append("    static constexpr long long PMAX = %d;" % max(sp["prod"], sm["prod"]))
+    out.append("    // solo ORDER=2: |c2*r+half| max (1o stadio) e |t+c1| max (fattore del 2o prodotto); 0 se ORDER=1")
+    out.append("    static constexpr long long P1MAX = %d;" % max(sp["p1"], sm["p1"]))
+    out.append("    static constexpr long long SMAX  = %d;" % max(sp["sm"], sm["sm"]))
     out.append("    // checksum (somma R, somma k*R, mod 2^64) su k = 1 .. K_CUT-1")
     out.append("    static constexpr uint64_t CHK_PLUS_1  = 0x%016xull;" % sp["chk1"])
     out.append("    static constexpr uint64_t CHK_PLUS_2  = 0x%016xull;" % sp["chk2"])

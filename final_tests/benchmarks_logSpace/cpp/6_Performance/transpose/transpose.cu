@@ -48,12 +48,15 @@ namespace cg = cooperative_groups;
 
 #include "../../S1.cuh"
 #include "../../S2.cuh"
+#include "../../S3_lut/S3.cuh"
 
 // Alias del formato LNNS sotto test: cambiate qui per testare 16_10 / 16_11 / 32_21
 using S1 = Encapsulator<float>;
 using S2_16_10 = LNNS<uint16_t, 10>;
 using S2_16_11 = LNNS<uint16_t, 11>;
 using S2_32_23 = LNNS<uint32_t, 23>;
+using S3_16_10 = LNNS_S3<uint16_t, 10>;
+using S3_32_21 = LNNS_S3<uint32_t, 21>;
 
 
 const char *sSDKsample = "Transpose";
@@ -463,6 +466,12 @@ int main(int argc, char **argv)
             break;
         case 6:
             runTest<S2_32_23>(size_x, size_y, deviceProp);
+            break;
+        case 7:
+            runTest<S3_16_10>(size_x, size_y, deviceProp);
+            break;
+        case 8:
+            runTest<S3_32_21>(size_x, size_y, deviceProp);
             break;
         default:
             printf("Invalid test number: %d\n", testNum);

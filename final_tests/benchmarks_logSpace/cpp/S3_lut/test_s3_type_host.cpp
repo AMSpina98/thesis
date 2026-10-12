@@ -40,18 +40,27 @@ static void run(const char* name, uint64_t seed) {
     for (U a : v) for (U b : v) {
         S2 a2 = S2::raw(a), b2 = S2::raw(b);
         S3 a3 = S3::raw(a), b3 = S3::raw(b);
-        CHECK(((a2 * b2).value) == ((a3 * b3).value), "mul %x %x", (unsigned)a, (unsigned)b);
-        CHECK(((a2 / b2).value) == ((a3 / b3).value), "div %x %x", (unsigned)a, (unsigned)b);
+        const bool spA = a == S3::LOG_NAN || a == S3::LOG_ZERO, spB = b == S3::LOG_NAN || b == S3::LOG_ZERO;
+        // senza clamp (S3::SATURATE == false) mul/div fra normali che escono dal campo si avvolgono: non confrontabili con S2
+        const int64_t msum = (int64_t)unp(a) + unp(b), mdif = (int64_t)unp(a) - unp(b);
+        const bool mul_cmp = S3::SATURATE || spA || spB || (std::llabs(msum) <= S3::MAX_MANTISSA);
+        const bool div_cmp = S3::SATURATE || spA || spB || (std::llabs(mdif) <= S3::MAX_MANTISSA);
+        if (mul_cmp) CHECK(((a2 * b2).value) == ((a3 * b3).value), "mul %x %x", (unsigned)a, (unsigned)b);
+        if (div_cmp) CHECK(((a2 / b2).value) == ((a3 / b3).value), "div %x %x", (unsigned)a, (unsigned)b);
         CHECK((a2 < b2) == (a3 < b3) && (a2 <= b2) == (a3 <= b3) && (a2 > b2) == (a3 > b3) &&
               (a2 >= b2) == (a3 >= b3) && (a2 == b2) == (a3 == b3) && (a2 != b2) == (a3 != b3), "cmp %x %x", (unsigned)a, (unsigned)b);
-        { S2 t2 = a2; t2 *= b2; S3 t3 = a3; t3 *= b3; CHECK(t2.value == t3.value, "mul= %x %x", (unsigned)a, (unsigned)b); }
-        { S2 t2 = a2; t2 /= b2; S3 t3 = a3; t3 /= b3; CHECK(t2.value == t3.value, "div= %x %x", (unsigned)a, (unsigned)b); }
+        if (mul_cmp) { S2 t2 = a2; t2 *= b2; S3 t3 = a3; t3 *= b3; CHECK(t2.value == t3.value, "mul= %x %x", (unsigned)a, (unsigned)b); }
+        if (div_cmp) { S2 t2 = a2; t2 /= b2; S3 t3 = a3; t3 /= b3; CHECK(t2.value == t3.value, "div= %x %x", (unsigned)a, (unsigned)b); }
         for (int sub = 0; sub < 2; ++sub) {
             S2 r2 = sub ? a2 - b2 : a2 + b2;
             S3 r3 = sub ? a3 - b3 : a3 + b3;
             S3 q3 = a3; if (sub) q3 -= b3; else q3 += b3;
             CHECK(q3.value == r3.value, "op= != op");
             const bool special = a == S3::LOG_NAN || b == S3::LOG_NAN || a == S3::LOG_ZERO || b == S3::LOG_ZERO;
+            // ZERO_VIA_K: zero + operando normale con mantissa < MINM + K_CUT (x < e^-496,7) non e' bit-identico a S2 (documentato)
+            const bool zk_skip = S3::ZERO_VIA_K && special && !(spA && spB) && a != S3::LOG_NAN && b != S3::LOG_NAN &&
+                                 ((spA ? (int64_t)unp(b) : (int64_t)unp(a)) - S3::MINM < (int64_t)s3lut::Tab<F>::K_CUT);
+            if (zk_skip) continue;
             if (special) { CHECK(r2.value == r3.value, "special add/sub %d %x %x: S2 %x S3 %x", sub, (unsigned)a, (unsigned)b, (unsigned)r2.value, (unsigned)r3.value); continue; }
             if (r2.value == S3::LOG_ZERO || r3.value == S3::LOG_ZERO) { CHECK(r2.value == r3.value, "zero mismatch %x %x", (unsigned)a, (unsigned)b); continue; }
             ++nadd;
@@ -77,8 +86,8 @@ static void run(const char* name, uint64_t seed) {
             case 2: mA = dsmall(rng); mB = mA + (int32_t)(rng() % 64) - 32; break;
             default: mA = dsmall(rng); mB = dsmall(rng); break;
         }
-        mA = std::max(S3::MIN_MANTISSA, std::min(S3::MAX_MANTISSA, mA));
-        mB = std::max(S3::MIN_MANTISSA, std::min(S3::MAX_MANTISSA, mB));
+        mA = std::max((int32_t)S3::MIN_MANTISSA, std::min((int32_t)S3::MAX_MANTISSA, mA));
+        mB = std::max((int32_t)S3::MIN_MANTISSA, std::min((int32_t)S3::MAX_MANTISSA, mB));
         const bool na = rng() & 1, nb = rng() & 1, sub = rng() & 1;
         S3 a = S3::raw(mk(na, mA)), b = S3::raw(mk(nb, mB));
         S3 r = sub ? a - b : a + b;
@@ -91,6 +100,7 @@ static void run(const char* name, uint64_t seed) {
         const long double ideal = (long double)mM + SC * (same ? log1pl(expl(-d)) : logl(-expm1l(-d)));
         const int32_t rm = unp(r.value);
         CHECK(((r.value & S3::SIGN_MASK) != 0) == sM, "segno");
+        if (!S3::SATURATE && (ideal >= (long double)S3::MAX_MANTISSA || ideal <= (long double)S3::MIN_MANTISSA)) continue;
         if (ideal >= (long double)S3::MAX_MANTISSA) { CHECK(rm == S3::MAX_MANTISSA, "clamp alto"); continue; }
         if (ideal <= (long double)S3::MIN_MANTISSA) { CHECK(rm == S3::MIN_MANTISSA, "clamp basso"); continue; }
         const long double e = fabsl((long double)rm - ideal);
@@ -107,7 +117,7 @@ static void run(const char* name, uint64_t seed) {
     CHECK(unp(S3(1.0).value) == 0 && S3(1.0).value == mk(0, 0), "ctor 1");
     CHECK(S3(-1.0).value == mk(1, 0), "ctor -1");
     CHECK(unp(S3(1e300).value) == S3::MAX_MANTISSA || F == 21, "sat alta double");
-    CHECK(unp(S3(std::numeric_limits<double>::infinity()).value) == S3::MAX_MANTISSA, "sat inf");
+    CHECK(unp(S3(std::numeric_limits<double>::infinity()).value) == S3::MAX_MANTISSA, "sat inf");   // conversione: sempre satura
     CHECK(unp(S3(1e-300).value) == S3::MIN_MANTISSA || F == 21, "sat bassa double");
     CHECK(S3(1e-320).value != S3::LOG_ZERO, "denormale non zero");
     for (double x : {0.37, 1.5, 2.0, 3.14159, 100.0, 12345.0}) {
@@ -123,7 +133,7 @@ static void run(const char* name, uint64_t seed) {
             CHECK(std::fabs(rt / x - 1) < 5e-6, "range double %g -> %g", x, rt);
         }
         S3 big(1e200), one(1.0);
-        CHECK(unp((big * big * big).value) == S3::MAX_MANTISSA, "saturazione a e^512 (~1e222)");
+        if (S3::SATURATE) CHECK(unp((big * big * big).value) == S3::MAX_MANTISSA, "saturazione a e^512 (~1e222)");
         CHECK(std::fabs((big + one).toDouble() / 1e200 - 1) < 5e-6, "1e200+1");
         CHECK(std::fabs((big - big).toDouble()) == 0.0, "x-x");
         CHECK(std::fabs((S3(3.0) + S3(5.0)).toDouble() - 8.0) < 8.0 * 5e-6, "3+5");

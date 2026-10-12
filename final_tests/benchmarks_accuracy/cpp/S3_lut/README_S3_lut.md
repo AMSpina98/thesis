@@ -38,3 +38,12 @@ Le tabelle sono `__device__ const` (cache L1/costante del dispositivo) e copie h
 - Diverso da S2 per costruzione: S2 sbaglia di piu' (float) a |ln x| grande (fino a ~60 LSB nei test); S3 no. Conversioni da/verso double non limitate a e^88.
 - NON ancora compilato con nvcc / eseguito su GPU (da fare sul PC: attenzione a `if constexpr`, `__clz`, array `__device__` negli header).
 - k=0 nella sottrazione non e' valido per `delta` (gestito a monte in `add_core`: x-x = zero).
+
+## Politiche di costo (S3.cuh)
+- `SATURATE` (16 bit: si, 32 bit: no): clamp ±MAX_MANTISSA dopo + - * /. A 32 bit il campo copre ln ±512 (~1e±222); oltre,
+  il campo si avvolge invece di saturare. `-DS3_ALWAYS_SATURATE` ripristina il clamp.
+- `ZERO_VIA_K` (16 bit: no, 32 bit: si): zero/NaN hanno la mantissa piu' bassa possibile, quindi in una somma il percorso
+  normale restituisce gia' l'altro operando (R = 0 per k >= K_CUT): niente select dedicate. Differisce dal riferimento solo
+  per operandi < e^-496,7 (~1e-216). `-DS3_EXACT_SPECIALS` ripristina le select.
+- `S3_lut_eval.cuh`: per 32_21 il primo stadio del quadratico e' a 32 bit, solo il secondo prodotto e' a 64 bit
+  (IMAD.WIDE) e il suo shift usa un funnel shift; risultato identico (verificato su tutti i k).

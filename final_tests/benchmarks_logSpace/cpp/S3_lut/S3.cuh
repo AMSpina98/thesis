@@ -82,6 +82,28 @@ struct LNNS_S3 {
     static constexpr StorageType LOG_ZERO = MANTISSA_SIGN_MASK;
     static constexpr StorageType LOG_NAN  = (StorageType)(SIGN_MASK | MANTISSA_SIGN_MASK);
 
+    // ---- politiche di costo (scelte a compile time per formato) --------------------------------
+    // SATURATE: clamp della mantissa a +-MAX_MANTISSA dopo + - * /. Senza clamp un overflow del campo
+    //   (|ln x| >= 2^(MANTISSA_BITS-1)/2^F) NON satura: il campo si avvolge. A 32 bit il campo copre ln +-512
+    //   (e^512 ~ 1e222, ben oltre double/float) quindi si omette; a 16 bit (ln +-16) il clamp resta.
+    //   Forzabile con -DS3_ALWAYS_SATURATE.
+    // ZERO_VIA_K: lo zero (e il NaN) hanno mantissa MINM = -2^(MANTISSA_BITS-1), inferiore a ogni valore
+    //   normale: in una somma k = mMax - mMin e' enorme (>= K_CUT => R = 0) e il percorso normale restituisce
+    //   gia' l'altro operando, senza select dedicate. Esatto per ogni operando con |ln| < 2^(MANTISSA_BITS-1)/2^F
+    //   - K_CUT/2^F (a 32 bit: x > e^-496,7 ~ 1e-216); a 16 bit K_CUT e' troppo grande (>= e^-8,4 ~ 2e-4)
+    //   quindi li' le select restano. Forzabile con -DS3_EXACT_SPECIALS.
+#ifdef S3_ALWAYS_SATURATE
+    static constexpr bool SATURATE = true;
+#else
+    static constexpr bool SATURATE = (sizeof(StorageType) == 2);
+#endif
+#ifdef S3_EXACT_SPECIALS
+    static constexpr bool ZERO_VIA_K = false;
+#else
+    static constexpr bool ZERO_VIA_K = (sizeof(StorageType) == 4);
+#endif
+    static constexpr int32_t MINM = -(int32_t)((uint32_t)1 << (MANTISSA_BITS - 1));   // mantissa di LOG_ZERO / LOG_NAN
+
     static_assert((sizeof(StorageType) == 2 && PRECISION_ == 10) ||
                   (sizeof(StorageType) == 4 && PRECISION_ == 21),
                   "LNNS_S3: tabelle disponibili solo per <uint16_t,10> e <uint32_t,21> (altri formati: gen_s3_tables.py)");
@@ -97,9 +119,12 @@ struct LNNS_S3 {
         constexpr int sh = 32 - MANTISSA_BITS;
         return (int32_t)((uint32_t)v << sh) >> sh;   // i bit sopra MANTISSA_BITS (segno del numero) escono con lo shift
     }
-    S3_HD static int32_t clampM(int32_t m) {
-        return m > MAX_MANTISSA ? MAX_MANTISSA : (m < MIN_MANTISSA ? MIN_MANTISSA : m);
+    // (tag-dispatch al posto di "if constexpr": compila anche in C++14; i cast evitano l'odr-use dei constexpr)
+    S3_HD static int32_t clampImpl(int32_t m, std::false_type) { return m; }
+    S3_HD static int32_t clampImpl(int32_t m, std::true_type) {
+        return m > (int32_t)MAX_MANTISSA ? (int32_t)MAX_MANTISSA : (m < (int32_t)MIN_MANTISSA ? (int32_t)MIN_MANTISSA : m);
     }
+    S3_HD static int32_t clampM(int32_t m) { return clampImpl(m, std::integral_constant<bool, SATURATE>()); }
     S3_HD static StorageType pack(StorageType sign, int32_t m) {
         return (StorageType)(sign | ((StorageType)(uint32_t)m & MANTISSA_MASK));
     }
@@ -109,6 +134,20 @@ struct LNNS_S3 {
     // gli indici restano in tabella, nessun overflow) e i casi speciali sovrascrivono il risultato con
     // select, in ordine di priorita' crescente. Niente return anticipati => niente BSSY/BSYNC/BMOV.
     // (In una sottrazione "b" e' gia' stato invertito di segno nel calcolo di sB, mai nei confronti.)
+    // zero/NaN come operando, con ZERO_VIA_K: il percorso normale ha gia' dato l'altro operando (k >= K_CUT, R = 0).
+    // Restano x-x e (zero,zero), ossia mA == mB con segni opposti oppure entrambi speciali.
+    template <bool SUB>
+    S3_HD static StorageType zero_cases(StorageType res, StorageType, StorageType, int32_t mA, int32_t mB, bool same, std::true_type) {
+        return (mA == mB && (!same || mA == MINM)) ? (StorageType)LOG_ZERO : res;
+    }
+    template <bool SUB>
+    S3_HD static StorageType zero_cases(StorageType res, StorageType a, StorageType b, int32_t mA, int32_t mB, bool same, std::false_type) {
+        res = (mA == mB && !same) ? (StorageType)LOG_ZERO : res;      // x - x
+        res = (a == LOG_ZERO) ? (SUB ? (StorageType)(SIGN_MASK ^ b) : b) : res;
+        res = (b == LOG_ZERO) ? a : res;                              // priorita' su a == 0 (anche in sub)
+        return res;
+    }
+
     template <bool SUB>
     S3_HD static StorageType add_core(StorageType a, StorageType b) {
         const int32_t mA = unpack(a), mB = unpack(b);
@@ -122,9 +161,7 @@ struct LNNS_S3 {
         const uint32_t k = (uint32_t)mMax - (uint32_t)mMin;          // >= 0, < 2^32
         const int32_t R = s3lut::delta_sel<PRECISION_>(k, same);
         StorageType res = pack(sg, clampM(mMax + R));
-        res = (mA == mB && !same) ? (StorageType)LOG_ZERO : res;      // x - x
-        res = (a == LOG_ZERO) ? (SUB ? (StorageType)(SIGN_MASK ^ b) : b) : res;
-        res = (b == LOG_ZERO) ? a : res;                              // priorita' su a == 0 (anche in sub)
+        res = zero_cases<SUB>(res, a, b, mA, mB, same, std::integral_constant<bool, ZERO_VIA_K>());
         res = (a == LOG_NAN || b == LOG_NAN) ? (StorageType)LOG_NAN : res;
         return res;
     }
